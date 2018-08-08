@@ -25,13 +25,17 @@ Header stolen from  : Greig Sheridan who stole it from Pat Richard's amazing "Ge
 
 ## Update History
 **:v2.20: The Cleanup Build**
+: v2.2: Cleaned Up Code
 * Fixed a bug with logging system culture
 * Removed some old redundant code
 * Passed script through ISESteriods PSSharper and applied corrections
 * Fixed a few typos
+* Fixed a few bugs introduced cleaning up my dodgy code
+* Fixed a bug with multiple pools using the same holiday set names
+* Depricated the ServiceID parameter, Specify the pool FQDN instead
+* Added warning for deprecated ServiceID
 * Updated Pat Richard's website
-* Removed PowerShell 5.1 cmdlet (Get-Timezone), using a WMI query instead
-
+* Removed PowerShell 5.1 cmdlet (Get-Timezone), now using a WMI query instead
 
 **:v2.10: The Supportability Build**
 * Added Script logging

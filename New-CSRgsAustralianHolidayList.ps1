@@ -165,7 +165,7 @@ If (!$LogFileLocation)
 #region Functions
 Function Write-Log 
 {
-  <#
+   <#
       .SYNOPSIS
       Function to output messages to the console based on their severity and create log files
 
@@ -178,13 +178,13 @@ Function Write-Log
       .PARAMETER Path
       The location of the logfile.
 
-      .PARAMETER severity
+      .PARAMETER Severity
       Sets the severity of the log message, Higher severities will call Write-Warning or Write-Error
 
-      .PARAMETER component
+      .PARAMETER Component
       Used to track the module or function that called "Write-Log" 
 
-      .PARAMETER logonly
+      .PARAMETER LogOnly
       Forces Write-Log to not display anything to the user
 
       .EXAMPLE
@@ -203,6 +203,8 @@ Function Write-Log
       .OUTPUTS
       This function does not create pipelined output
   #>
+
+
   [CmdletBinding()]
   PARAM(
     [String]$Message,
@@ -658,11 +660,11 @@ If ($ServiceID.length -eq 0)
 }
 Else
 {
-Write-Log -Message 'ServiceID parameter detected, display warning' -severity 1
-Write-Log -Message 'The ServiceID parameter is being deprecated. Please use the FrontEndPool parameter instead.' -severity 3
-Write-Log -Message 'If you have Multiple Frontend Pools that use the same Holiday set names you MUST use the FrontEndPool parameter' -severity 3
-Write-Log -Message 'Pausing for 10 seconds' -severity 1
-start-sleep -Seconds 10
+  Write-Log -Message 'ServiceID parameter detected, display warning' -severity 1
+  Write-Log -Message 'The ServiceID parameter is being deprecated. Please use the FrontEndPool parameter instead.' -severity 3
+  Write-Log -Message 'If you have Multiple Frontend Pools that use the same Holiday set names you MUST use the FrontEndPool parameter' -severity 3
+  Write-Log -Message 'Pausing for 10 seconds' -severity 1
+  start-sleep -Seconds 10
 }
 
 #We should have a valid service ID by now
