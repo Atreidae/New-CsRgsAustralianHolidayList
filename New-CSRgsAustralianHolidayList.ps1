@@ -18,6 +18,16 @@
     Header stolen from    : Greig Sheridan who stole it from Pat Richard's amazing "Get-CsConnections.ps1"
 
     Revision History	
+
+
+    : v2.30: The Feedback Build
+    : Added display of dates to logs
+    : Added a notification at the end of the script showing the last imported date.
+    : Added last run date
+    : Added RGS Update Time Stamp
+    : Added Error handing for 0 FrontEnds
+    : Fixed a bug with 1 FrontEnd Pools throwing errors when updating existing holidays
+
     : v2.2: Cleaned Up Code
     : Fixed a bug with logging system culture
     : Removed some old redundant code
@@ -155,7 +165,7 @@ If (!$LogFileLocation)
 {
   $LogFileLocation = $PSCommandPath -replace '.ps1', '.log'
 }
-[float]$ScriptVersion = '2.2'
+[float]$ScriptVersion = '2.3'
 [string]$GithubRepo = 'New-CsRgsAustralianHolidayList'
 [string]$GithubBranch = 'master' #todo
 [string]$BlogPost = 'http://www.skype4badmin.com/australian-holiday-rulesets-for-response-group-service/'
@@ -386,7 +396,6 @@ Else
 
 if ($DisableScriptUpdate -eq $false) 
 {
-  Write-Log -Message 'Checking for Script Update' -severity 1 #todo
   Get-ScriptUpdate
 }
 
@@ -529,6 +538,11 @@ If ($ServiceID.length -eq 0)
   Write-Log -Message 'No ServiceID entered, Searching for valid ServiceID' -severity 3
   Write-Log -Message 'Looking for Front End Pools' -severity 1
   $PoolNumber = ($Pools).count
+  if ($PoolNumber -eq 0) 
+  { 
+     Write-Log -Message "Couldn't locate any FrontEnd Pools! Aborting script" -severity 3
+     Throw "Couldn't locate RGS pool. Abort script"
+     }
   if ($PoolNumber -eq 1) 
   { 
     Write-Log -Message "Only found 1 Front End Pool, $Pools.poolfqdn, Selecting it" -severity 1
@@ -555,6 +569,7 @@ If ($ServiceID.length -eq 0)
       {
         Write-Log -Message 'Updating ServiceID parameter' -severity 1
         $ServiceID = $RGSIDs.Identity.tostring()
+        $FrontEndPool = $Pools.poolfqdn
       }
       1 
       {
@@ -668,6 +683,15 @@ Else
 }
 
 #We should have a valid service ID by now
+
+#Check for last run flag.
+
+$Lastrun = (Get-CsRgsHolidaySet | where {$_.Name -like "_(dont use)_ Aussie*" -and $_.Ownerpool -like $FrontEndPool} -ErrorAction silentlycontinue)
+If ($Lastrun) {
+     Write-Log -Message 'Looks like we have been run on this pool before' -severity 1
+     Write-Log -Message "Found existing RGS Object $($lastrun.name)" -severity 1
+     }
+    
 
 Write-Log -Message 'Parsing XML data' -severity 1
 foreach ($State in $XMLdata.ausgovEvents.jurisdiction) 
@@ -864,7 +888,10 @@ Write-Log -Message 'Finished adding events' -severity 1
 Write-Log -Message "Writing $National to Database" -severity 1
 Try 
 {
+  #Update Database  
   Set-CsRgsHolidaySet -Instance $holidayset
+
+
 }
 Catch 
 {
@@ -874,8 +901,28 @@ Catch
   Write-Log -Message "$FailedItem failed. The error message was $ErrorMessage" -ForegroundColor Red
   Throw $ErrorMessage
 }
-Write-Host ''
-Write-Host ''
-Write-Log -Message 'Looks like everything went okay. Here are your current RGS Holiday Sets' -severity 1
 
-Get-CsRgsHolidaySet | Select-Object -Property OwnerPool, Name
+  #Update Last Run Flag
+  Write-Log -Message "Updating Last Run Holiday Set" -severity 1
+  if ($Lastrun) {
+        Get-CsRgsHolidaySet | where {$_.Name -like "_(dont use)_ Aussie*" -and $_.Ownerpool -like $FrontEndPool} | Remove-CsRgsHolidaySet
+    }
+  #Write a new Last Run Flag
+    $ShortDate = (Get-Date -Format dd/MM/yyyy)  
+    $PlaceholderDate = (New-CsRgsHoliday -StartDate '11/11/1970 12:00 AM' -EndDate '12/11/1970 12:00 AM' -Name '_(Dont Use)_ Aussie Holidays updated on 5/11/2018 by New-CsRgsAustralianHolidayList http://bit.ly/CsRgsAU')
+    [void] (New-CsRgsHolidaySet -Parent $ServiceID -Name "_(Dont Use)_ Aussie Holidays updated on $ShortDate by New-CsRgsAustralianHolidayList http://bit.ly/CsRgsAU" -HolidayList $PlaceholderDate)
+    Write-Log -Message "Last Run Flag Updated" -severity 1
+
+#Find display the last holiday imported
+
+Write-Host ''
+Write-Host ''
+$LastDate = ($NatHolidayset | select -Last 1 date).date.tostring()
+$FirstDate = ($NatHolidayset | select -First 1 date).date.tostring()
+Write-Log -Message 'Looks like everything went okay. Here are your current RGS Holiday Sets' -severity 1
+Get-CsRgsHolidaySet | Select-Object -Property OwnerPool, Name | Format-Table
+
+Write-Host ''
+Write-Host ''
+Write-Log -Message "Imported $XMLCount events between $Firstdate and $LastDate. You will need to re-run this script before $LastDate." -severity 2
+
