@@ -12,9 +12,9 @@ Holiday Data taken from http://www.australia.gov.au/about-australia/special-date
 	    
 	
 ## NOTES  
-Version  	         	: 2.20
+Version  	         	: 2.30
 
-Date      			    : 19/05/2018
+Date      			    : 5/11/2018
 
 Lync Version	      : Tested against Skype4B Server 2015 and Lync Server 2013
 
@@ -24,6 +24,14 @@ Header stolen from  : Greig Sheridan who stole it from Pat Richard's amazing "Ge
 
 
 ## Update History
+**:v2.30: The Feedback Build**
+* Added display of dates to logs
+* Added a notification at the end of the script showing the last imported date.
+* Added last run date
+* Added RGS Update Time Stamp
+* Added Error handing for 0 FrontEnds
+
+
 **:v2.20: The Cleanup Build**
 * Fixed a bug with logging system culture
 * Removed some old redundant code
