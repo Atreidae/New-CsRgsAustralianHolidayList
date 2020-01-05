@@ -28,6 +28,7 @@
     : Added, Year tagging to Holiday names
     : Added, Better logging messages for writing to the database, esp when an FE is offline
     : Fixed, Script would always put the date 5/11/2018 in one of the last run place holders, now correctly uses ShortDate
+    : Fixed, Sorted a bug with unattended mode not updating the last run flag
 
 
     : v2.30: The Feedback Build
@@ -915,10 +916,14 @@ If ($ServiceID.length -eq 0)
 		
     Write-Log -Message "Using Front End Pool $FrontEndPool" -severity 1
     $RGSIDs = (Get-CsRgsConfiguration -Identity $FrontEndPool)
+
     $Poolfqdn = $FrontEndPool
 
 
-
+    if ($Unattended)
+    {
+    $ServiceID = $RGSIDs.Identity.tostring()
+    }
     if (!$Unattended) 
     {
       #Prompt user to confirm
@@ -1194,7 +1199,7 @@ if ($Lastrun) {
 #Write a new Last Run Flag
 $ShortDate = (Get-Date -Format dd/MM/yyyy)  
 $PlaceholderDate = (New-CsRgsHoliday -StartDate '11/11/1970 12:00 AM' -EndDate '12/11/1970 12:00 AM' -Name "_(Dont Use)_ Aussie Holidays updated on $ShortDate by New-CsRgsAustralianHolidayList http://bit.ly/CsRgsAU UcMadScientist")
-[void] (New-CsRgsHolidaySet -Parent $ServiceID -Name "_(Dont Use)_ Aussie Holidays updated on $ShortDate by New-CsRgsAustralianHolidayList http://bit.ly/CsRgsAU" -HolidayList $PlaceholderDate)
+[void](New-CsRgsHolidaySet -Parent $ServiceID -Name "_(Dont Use)_ Aussie Holidays updated on $ShortDate by New-CsRgsAustralianHolidayList http://bit.ly/CsRgsAU" -HolidayList $PlaceholderDate)
 Write-Log -Message "Last Run Flag Updated" -severity 2
 
 #Find display the last holiday imported
@@ -1227,8 +1232,8 @@ Write-Host "URL to Share: http://bit.ly/CsRgsAU" -ForegroundColor Cyan -Backgrou
 # SIG # Begin signature block
 # MIINFwYJKoZIhvcNAQcCoIINCDCCDQQCAQExCzAJBgUrDgMCGgUAMGkGCisGAQQB
 # gjcCAQSgWzBZMDQGCisGAQQBgjcCAR4wJgIDAQAABBAfzDtgWUsITrck0sYpfvNR
-# AgEAAgEAAgEAAgEAAgEAMCEwCQYFKw4DAhoFAAQURDpibFi/vKsXpVNHC1jqKZJC
-# X6mgggpZMIIFITCCBAmgAwIBAgIQD274plv3rQv2N1HXnqk5jzANBgkqhkiG9w0B
+# AgEAAgEAAgEAAgEAAgEAMCEwCQYFKw4DAhoFAAQU/BF448ryg955E+PffDxd0UAA
+# kPCgggpZMIIFITCCBAmgAwIBAgIQD274plv3rQv2N1HXnqk5jzANBgkqhkiG9w0B
 # AQsFADByMQswCQYDVQQGEwJVUzEVMBMGA1UEChMMRGlnaUNlcnQgSW5jMRkwFwYD
 # VQQLExB3d3cuZGlnaWNlcnQuY29tMTEwLwYDVQQDEyhEaWdpQ2VydCBTSEEyIEFz
 # c3VyZWQgSUQgQ29kZSBTaWduaW5nIENBMB4XDTIwMDEwNTAwMDAwMFoXDTIyMDky
@@ -1288,11 +1293,11 @@ Write-Host "URL to Share: http://bit.ly/CsRgsAU" -ForegroundColor Cyan -Backgrou
 # MC8GA1UEAxMoRGlnaUNlcnQgU0hBMiBBc3N1cmVkIElEIENvZGUgU2lnbmluZyBD
 # QQIQD274plv3rQv2N1HXnqk5jzAJBgUrDgMCGgUAoHgwGAYKKwYBBAGCNwIBDDEK
 # MAigAoAAoQKAADAZBgkqhkiG9w0BCQMxDAYKKwYBBAGCNwIBBDAcBgorBgEEAYI3
-# AgELMQ4wDAYKKwYBBAGCNwIBFTAjBgkqhkiG9w0BCQQxFgQU27VgEfzSwJAz4omo
-# 64LGtp0samUwDQYJKoZIhvcNAQEBBQAEggEAUU5xdCPXYXooMlYPhXn9FIDdIQf+
-# n/rdYxriVCIcxjelK8sITsexHzaj/fGWx6olo7ixIvES33iYR+5HygBeqeWM76r+
-# 5ZSaFgtIN/eh1ONrTkTWt5guyDf+CEmzgIxUKUITwnWAe2F0MR2hM5ZIUX6WWLSb
-# cr0ITpPfMD2HfooFHVgPZCSb/YPH7clNPzAnZEH7McYETULq+RrYuLzuUzk0xEcA
-# jG8yub7mRm0QMw0FS790mNCbKBT/bHSNcJ7HUbGj0Xxi9iy45WzkNiLDRmsaFOu6
-# dtLVV9QGtCCQ8j6a5O1wDQgjv8xGcnXvrl2/MlcmlmEuszEE46WzYp8TIA==
+# AgELMQ4wDAYKKwYBBAGCNwIBFTAjBgkqhkiG9w0BCQQxFgQURW2WYrorkDak10CC
+# QXvhPn9il90wDQYJKoZIhvcNAQEBBQAEggEANQBUCRiSL17b8LQzpYEF9Rd1DlRK
+# ie61zJm1sA/ABVO9HTKAnKzY61U9Mb48PHLrtyerobV8ueoI3X9UmAVbA/660M5k
+# tpV2R0aIq9hwqC0teRG5n5o6ztwsyZLpDE6X+dxkFR+Zli67aw50Qavu8lAIhJbe
+# imFY5nbBum6ic2svStc3MMr0D8QT3M9l4g8xFSvslXPJ9hHehCllBWBQnnlcI15x
+# 5CehCUzytUfoSY1x2cc5uPOEW40WP+S9odgYJtF2AdXKs+ikupnac4gj/brUANUG
+# DDPGflg6e0WIKvogR3YJmpxjSaMT9DSf/4UNfcz2d99jY9n7Mgwgmvj0tA==
 # SIG # End signature block

@@ -8,22 +8,34 @@ Created by James Arber. www.skype4badmin.com
 Although every effort has been made to ensure this list is correct, dates change and sometimes I goof. 
 Please use at your own risk.
 
-Holiday Data taken from http://www.australia.gov.au/about-australia/special-dates-and-events/public-holidays
+Holiday Data taken from https://data.gov.au/data/dataset/b1bc6077-dadd-4f61-9f8c-002ab2cdff10 
 	    
 	
 ## NOTES  
-Version  	         	: 2.30
+Version  	          : 3.0
 
-Date      			    : 5/11/2018
+Date      			  : 6/01/2018
 
 Lync Version	      : Tested against Skype4B Server 2015 and Lync Server 2013
 
 Author    		      : James Arber
 
-Header stolen from  : Greig Sheridan who stole it from Pat Richard's amazing "Get-CsConnections.ps1"
+Header stolen from    : Greig Sheridan who stole it from Pat Richard's amazing "Get-CsConnections.ps1"
 
 
 ## Update History
+**:v3.0: The ScoMo holiday build**
+* ScoMo takes a holiday and so does the XML data I was using to get accurate dates
+* Updated, Changed to data.gov.au Datasource. Alot of rewriting
+* Updated, Functions replaced with newer versions
+* Added, Script has been signed, so you know what your running hasnt been fiddled with. Thanks DigiCert!
+* Added, Script now outputs the last date it ingested in proper region format
+* Added, non-domain joined detection
+* Added, Year tagging to Holiday names
+* Added, Better logging messages for writing to the database, esp when an FE is offline
+* Fixed, Script would always put the date 5/11/2018 in one of the last run place holders, now correctly uses ShortDate
+* Fixed, Sorted a bug with unattended mode not updating the last run flag
+
 **:v2.30: The Feedback Build**
 * Added display of dates to logs
 * Added a notification at the end of the script showing the last imported date.
@@ -153,3 +165,10 @@ Pat Richard http://www.ehloworld.com @patrichard
 
 ### Proxy Detection
 Michel de Rooij	http://eightwone.com
+
+
+### Testing 
+Sean Werner https://www.linkedin.com/in/sean-werner-88ab126b/ @swerner1k
+
+### Code Signing Certificate
+DigiCert https://www.digicert.com/
