@@ -1,23 +1,34 @@
 ﻿<#  
-    .SYNOPSIS  
+    .SYNOPSIS
     This script creates RGS holidaysets for Australian states based on live data from the Australian Government website
 
 
-    .DESCRIPTION  
+    .DESCRIPTION
     Created by James Arber. www.skype4badmin.com
-    Although every effort has been made to ensure this list is correct, dates change and sometimes I goof. 
+    Although every effort has been made to ensure this list is correct, dates change and sometimes I goof.
     Please use at your own risk.
-    Holiday Data taken from http://www.australia.gov.au/about-australia/special-dates-and-events/public-holidays
-	    
-	
-    .NOTES  
-    Version      	      : 2.2
-    Date			      : 19/05/2018
-    Lync Version		  : Tested against Skype4B Server 2015 and Lync Server 2013
-    Author    			  : James Arber
-    Header stolen from    : Greig Sheridan who stole it from Pat Richard's amazing "Get-CsConnections.ps1"
+    Holiday Data taken from https://data.gov.au/data/dataset/b1bc6077-dadd-4f61-9f8c-002ab2cdff10
 
-    Revision History	
+    .NOTES
+    Version             : 3.0
+    Date                : 06/01/2020
+    Lync Version        : Tested against Skype4B Server 2015 and Lync Server 2013
+    Author              : James Arber
+    Header stolen from  : Greig Sheridan who stole it from Pat Richard's amazing "Get-CsConnections.ps1"
+
+    Revision History
+
+    : v3.0: The ScoMo holiday build
+    : ScoMo takes a holiday and so does the XML data I was using to get accurate dates
+    : Updated, Changed to data.gov.au Datasource. Alot of rewriting
+    : Updated, Functions replaced with newer versions
+    : Added, Script has been signed, so you know what your running hasnt been fiddled with. Thanks DigiCert!
+    : Added, Script now outputs the last date it ingested in proper region format
+    : Added, non-domain joined detection
+    : Added, Year tagging to Holiday names
+    : Added, Better logging messages for writing to the database, esp when an FE is offline
+    : Fixed, Script would always put the date 5/11/2018 in one of the last run place holders, now correctly uses ShortDate
+
 
     : v2.30: The Feedback Build
     : Added display of dates to logs
@@ -26,6 +37,7 @@
     : Added RGS Update Time Stamp
     : Added Error handing for 0 FrontEnds
     : Fixed a bug with 1 FrontEnd Pools throwing errors when updating existing holidays
+
 
     : v2.2: Cleaned Up Code
     : Fixed a bug with logging system culture
@@ -71,13 +83,14 @@
     : Auto removes any dates not listed by the Australian Government (such as old dates) if the $RemoveExistingRules is set
     : Script no longer deletes existing timeframes, No need to re-assign to workflows!
 
-	
+
     : v1.1: Fix for Typo in Victora Holiday set
     : Fix ForEach loop not correctly removing old time frames
     : Fix Documentation not including the SID for ServiceID parameter
-                        
+
+
     : v1.0: Initial Release
-						
+
     Disclaimer: Whilst I take considerable effort to ensure this script is error free and wont harm your enviroment.
     I have no way to test every possible senario it may be used in. I provide these scripts free
     to the Lync and Skype4B community AS IS without any warranty on its appropriateness for use in
@@ -89,9 +102,12 @@
     loss of business information, or other pecuniary loss) arising out of the use of or inability
     to use the script or documentation.
 
-    Acknowledgements 	
+    Acknowledgements
     : Testing and Advice
     Greig Sheridan https://greiginsydney.com/about/ @greiginsydney
+
+    : Testing
+    Sean Werner https://www.linkedin.com/in/sean-werner-88ab126b/ @swerner1k
 
     : Auto Update Code
     Pat Richard https://ucunleashed.com @patrichard
@@ -99,8 +115,11 @@
     : Proxy Detection
     Michel de Rooij	http://eightwone.com
 
-  								
-    .INPUTS 
+    : Code Signing Certificate
+    DigiCert https://www.digicert.com/
+
+
+    .INPUTS
     None. New-CsRgsAustralianHolidayList.ps1 does not accept pipelined input.
 
     .OUTPUTS
@@ -130,8 +149,8 @@
     Also stops the script from checking for updates
     Check the script works before using this!
 
-    .LINK  
-    http://www.skype4badmin.com/australian-holiday-rulesets-for-response-group-service/
+    .LINK
+    http://www.UcMadScientist.com/australian-holiday-rulesets-for-response-group-service/
 
 
     .EXAMPLE
@@ -153,27 +172,28 @@ param(
   [Parameter(Position = 4)] [switch]$DisableScriptUpdate,
   [Parameter(Position = 4)] [switch]$Unattended,
   [Parameter(Position = 5)] [switch]$RemoveExistingRules,
-  [Parameter(Position = 6)] [string]$LogFileLocation
+  [Parameter(Position = 6)] [string]$LogFileLocation,
+  [Parameter(Position = 7)] [switch]$DownloadOnly
 )
 #region config
 [Net.ServicePointManager]::SecurityProtocol = 'tls12, tls11, tls'
-$MaxCacheAge = 7 # Max age for XML cache, older than this # days will force info refresh
-$SessionCache = Join-Path -Path $PSScriptRoot -ChildPath 'AustralianHolidays.xml' #Filename for the XML data
+$MaxCacheAge = 30 # Max age for XML cache, older than this # days will force info refresh
+$DataSetCache = Join-Path -Path $PSScriptRoot -ChildPath 'b1bc6077-dadd-4f61-9f8c-002ab2cdff10.xml' #Filename for the XML data list
 If (!$LogFileLocation) 
 {
-  $LogFileLocation = $PSCommandPath -replace '.ps1', '.log'
+  $script:LogFileLocation = $PSCommandPath -replace '.ps1', '.log'
 }
-[float]$ScriptVersion = '2.3'
+[float]$ScriptVersion = '3.0'
 [string]$GithubRepo = 'New-CsRgsAustralianHolidayList'
 [string]$GithubBranch = 'master' #todo
-[string]$BlogPost = 'http://www.skype4badmin.com/australian-holiday-rulesets-for-response-group-service/'
+[string]$BlogPost = 'http://www.UcMadScientist.com/australian-holiday-rulesets-for-response-group-service/'
 #endregion config
 
 
 #region Functions
-Function Write-Log 
+Function Write-Log
 {
-   <#
+  <#
       .SYNOPSIS
       Function to output messages to the console based on their severity and create log files
 
@@ -203,7 +223,7 @@ Function Write-Log
       N/A
 
       .LINK
-      http://www.skype4badmin.com
+      http://www.UcMadScientist.com
 
       .INPUTS
       This function does not accept pipelined input
@@ -211,19 +231,18 @@ Function Write-Log
       .OUTPUTS
       This function does not create pipelined output
   #>
-
-
-  [CmdletBinding()]
-  PARAM(
-    [String]$Message,
-    [String]$Path = $LogFileLocation,
-    [int]$severity = 1,
-    [string]$component = 'Default',
-    [switch]$logonly
+  PARAM
+  (
+    [Parameter(Mandatory)][String]$Message,
+    [String]$Path = $script:LogFileLocation,
+    [int]$Severity = 1,
+    [string]$Component = 'Default',
+    [switch]$LogOnly
   )
-  $Date = Get-Date -Format 'HH:mm:ss'
-  $Date2 = Get-Date -Format 'MM-dd-yyyy'
+  $Date             = Get-Date -Format 'HH:mm:ss'
+  $Date2            = Get-Date -Format 'MM-dd-yyyy'
   $MaxLogFileSizeMB = 10
+  
   If(Test-Path -Path $Path)
   {
     if(((Get-ChildItem -Path $Path).length/1MB) -gt $MaxLogFileSizeMB) # Check the size of the log file and archive if over the limit.
@@ -233,27 +252,35 @@ Function Write-Log
     }
   }
          
-  "$env:ComputerName date=$([char]34)$Date2$([char]34) time=$([char]34)$Date$([char]34) component=$([char]34)$component$([char]34) type=$([char]34)$severity$([char]34) Message=$([char]34)$Message$([char]34)"| Out-File -FilePath $Path -Append -NoClobber -Encoding default
-  If (!$logonly) 
+  "$env:ComputerName date=$([char]34)$Date2$([char]34) time=$([char]34)$Date$([char]34) component=$([char]34)$Component$([char]34) type=$([char]34)$Severity$([char]34) Message=$([char]34)$Message$([char]34)"| Out-File -FilePath $Path -Append -NoClobber -Encoding default
+  If (!$LogOnly) 
   {
     #If LogOnly is set, we dont want to write anything to the screen as we are capturing data that might look bad onscreen
-    #If the log entry is just informational (less than 2), output it to write-host
-    if ($severity -le 2) 
+      
+      
+    #If the log entry is just Verbose (1), output it to verbose
+    if ($Severity -eq 1) 
     {
-      "Info: $Message"| Write-Host -ForegroundColor Green
+      "$Date $Message"| Write-Verbose
     }
-    #If the log entry has a severity of 3 assume its a warning and write it to write-warning
-    if ($severity -eq 3) 
+      
+    #If the log entry is just informational (2), output it to write-host
+    if ($Severity -eq 2) 
+    {
+      "Info: $Date $Message"| Write-Host -ForegroundColor Green
+    }
+    #If the log entry has a severity of 3 assume it's a warning and write it to write-warning
+    if ($Severity -eq 3) 
     {
       "$Date $Message"| Write-Warning
     }
-    #If the log entry has a severity of 4 or higher, assume its an error and display an error message (Note, critical errors are caught by throw statements so may not appear here)
-    if ($severity -ge 4) 
+    #If the log entry has a severity of 4 or higher, assume it's an error and display an error message (Note, critical errors are caught by throw statements so may not appear here)
+    if ($Severity -ge 4) 
     {
       "$Date $Message"| Write-Error
     }
   }
-} #end WriteLog
+}
 
 Function Get-IEProxy 
 {
@@ -287,7 +314,7 @@ Function Get-ScriptUpdate
 {
   if ($DisableScriptUpdate -eq $false) 
   {
-    Write-Log -component 'Self Update' -Message 'Checking for Script Update' -severity 1
+    Write-Log -component 'Self Update' -Message 'Checking for Script Update' -severity 2
     Write-Log -component 'Self Update' -Message 'Checking for Proxy' -severity 1
     $ProxyURL = Get-IEProxy
     If ( $ProxyURL) 
@@ -303,8 +330,8 @@ Function Get-ScriptUpdate
   If ($GitHubScriptVersion.Content.length -eq 0) 
   {
     Write-Log -component 'Self Update' -Message 'Error checking for new version. You can check manually here' -severity 3
-    Write-Log -component 'Self Update' -Message $BlogPost -severity 1
-    Write-Log -component 'Self Update' -Message 'Pausing for 5 seconds' -severity 1
+    Write-Log -component 'Self Update' -Message $BlogPost -severity 2
+    Write-Log -component 'Self Update' -Message 'Pausing for 5 seconds' -severity 2
     Start-Sleep -Seconds 5
   }
   else 
@@ -346,134 +373,380 @@ Function Get-ScriptUpdate
     }   
     Else
     {
-      Write-Log -component 'Self Update' -Message "Script is up to date on $GithubBranch branch" -severity 1
+      Write-Log -component 'Self Update' -Message "Script is up to date on $GithubBranch branch" -severity 2
     }
   }
 }
 
+
+Function Import-ManagementTools 
+{
+  <#
+      .SYNOPSIS
+      Function to check for and import Skype4B Management tools
+      
+
+      .DESCRIPTION
+      Checks for and loads the approprate modules for Skype4B
+      Will throw an error and abort script if they arent found
+
+      Version                : 0.5
+      Date                   : 20/11/2019 #todo
+      Lync Version           : Tested against Skype4B 2015
+      Author                 : James Arber
+      Header stolen from     : Greig Sheridan who stole it from Pat Richard's amazing "Get-CsConnections.ps1"
+
+ 
+      .NOTES
+      Version      	      : 0.1
+      Date			          : 31/07/2018
+      Lync Version		    : Tested against Skype4B 2015
+      Author    			    : James Arber
+
+      .LINK
+      http://www.skype4badmin.com
+
+      .INPUTS
+      This function does not accept pipelined input
+
+      .OUTPUTS
+      This function does not create pipelined output
+  #>
+
+  $function = 'Import-ManagementTools'
+  #Import the Skype for Business / Lync Modules and error if not found
+  Write-Log -component $function -Message 'Checking for Lync/Skype management tools' -Severity 2
+  $ManagementTools             =  $false
+  if(!(Get-Module -Name 'SkypeForBusiness')) {Import-Module -Name SkypeForBusiness -Verbose:$false}
+  if(!(Get-Module -Name 'Lync')) {Import-Module -Name Lync -Verbose:$false}
+  if(Get-Module -Name 'SkypeForBusiness') {$ManagementTools = $true}
+  if(Get-Module -Name 'Lync') {$ManagementTools = $true}
+  if(!$ManagementTools) {
+    Write-Log -Message 'Could not locate Lync/Skype4B Management tools. Script Exiting' -Severity 5 -Component $Function
+    Throw 'Unable to load Skype4B/Lync management tools'
+    Exit
+  }
+  Write-Log -component $function -Message 'Management tools loaded successfully' -Severity 2
+}
+
+
+Function Get-XmlFile
+{
+  $script:LoopCheck ++
+  If ($script:LoopCheck -ge 3)
+  {
+    Write-Log -Message 'Loopcheck Triggered, Get-XMLFile has been called at least 3 times, Abort script' -severity 3
+    Exit
+  }
+
+  $SessionCacheValid = $False
+  If (!(Test-Path -Path $DataSetCache)) #File Missing, Download it
+  {
+    Write-Log -Message 'Downloading Date list from data.gov.au' -severity 2
+    Try 
+    {
+      Invoke-WebRequest -Uri 'https://data.gov.au/data/dataset/b1bc6077-dadd-4f61-9f8c-002ab2cdff10/gmd' -TimeoutSec 20 -OutFile $DataSetCache -Proxy $ProxyURL #-PassThru
+    }
+  
+    Catch 
+    {
+      Write-Log -Message 'An error occurred attempting to download XML file automatically' -severity 3
+      Write-Log -Message 'Download the file from the URI below, name it "b1bc6077-dadd-4f61-9f8c-002ab2cdff10.xml" and place it in the same folder as this script' -severity 3
+      Write-Log -Message 'https://data.gov.au/data/dataset/b1bc6077-dadd-4f61-9f8c-002ab2cdff10/gmd' 
+      Throw ('Problem retrieving XML file {0}' -f $error[0])
+      Exit 1
+    }
+  }
+  
+  If (Test-Path -Path $DataSetCache) #File Exists, Check it 
+  {
+    Try 
+    {
+      If ( (Get-ChildItem -Path $DataSetCache).LastWriteTime -ge (Get-Date).AddDays( - $MaxCacheAge)) #Check to see if the XML file is too old to be used
+      {
+        Write-Log -Message 'Dataset XML file found and not too old. Reading data' -severity 2
+        
+        #Import the file and check for good XML Data
+        Try 
+        {
+          [xml]$XMLDataSets = Get-Content -Path $DataSetCache 
+        }
+        Catch
+        {
+          Write-Log -Message 'Error Reading XML File'  -severity 3
+          Throw ('Error Reading XML File {0}' -f $error[0])
+        }
+        
+        #check the file has events
+        if ($XMLDataSets.MD_Metadata.distributionInfo.MD_Distribution.transferOptions.MD_DigitalTransferOptions.onLine.CI_OnlineResource.name.count -le 2) 
+        {
+          Write-Log -Message 'Downloaded file doesnt contain expected data, Less than 2 results' -severity 3
+          Throw 'XML Index Check Failed - Too Few Events'
+        }
+          
+       
+        #Show the user the updated timestamp
+        $IndexUpdated = ($XMLDataSets.MD_Metadata.dateStamp.Date)
+        Write-Log -Message "Data.gov.au data last updated on $IndexUpdated"  -severity 2
+        $SessionCacheValid = $true
+
+      }
+      Else 
+      {
+        Write-Log -Message 'XML file expired. Will re-download XML from datagov.au' -severity 2
+        Try 
+        {
+          Remove-item -Path $DataSetCache
+        }
+        Catch 
+        {
+          Write-Log -Message "Error Removing old XML file, please manualy delete $DatasetCache and run this script again"  -severity 3
+          Exit
+        }
+        #Now the file is gone, Call ourselves
+        Get-XmlFile
+        Return
+               
+      }
+    }
+     
+    
+    Catch 
+    {
+      Write-Log -Message 'Error reading XML file or CSV file invalid - Will re-download' -severity 3
+      Try 
+      {
+        Remove-item -Path $DataSetCache
+      }
+      Catch 
+      {
+        Write-Log -Message "Error Removing old XML file, please manualy delete $DatasetCache and run this script again"  -severity 3
+        Exit
+      }
+      #Now the file is gone, Call ourselves
+      Get-XmlFile
+      Return
+      
+    }
+    
+  }
+  #Now we should have a good XML file, build an array of Data sets, their update times, file names and urls
+  $script:XMLDataSetTable = @()
+  ForEach($dataset in $XMLDataSets.MD_Metadata.distributionInfo)
+  {
+    $Filename = (Split-Path -Path $dataset.MD_Distribution.transferOptions.MD_DigitalTransferOptions.onLine.CI_OnlineResource.linkage.url -Leaf )
+    $DataSetEntry = New-Object PSObject -property @{
+      Name="$($dataset.MD_Distribution.transferOptions.MD_DigitalTransferOptions.onLine.CI_OnlineResource.name.innertext)";
+      Url="$($dataset.MD_Distribution.transferOptions.MD_DigitalTransferOptions.onLine.CI_OnlineResource.linkage.url)";
+      Filename=$Filename
+    }#End of DataSetEntry codeblock
+          
+    #Add the dataset to the Array
+    $script:XMLDataSetTable = ($script:XMLDataSetTable + $DataSetEntry)            
+  }
+          
+ 
+}
+
+Function Get-CsvFiles
+{
+
+
+  ForEach ($CSVDataSet in $script:XMLDataSetTable[1,2])
+  {
+   
+    $CsvFilename = (Join-Path -Path $PSScriptRoot -ChildPath ($CSVDataSet.filename))#Filename for the CSV data Set
+    Write-Log -Message "Checking CSV file $($CSVDataSet.filename)" -Severity 2
+            
+    If (!(Test-Path -Path $CsvFilename))
+    {
+      Write-Log -Message "CSV file $($CSVDataSet.filename) missing. Will attempt to download CSV from datagov.au" -severity 2
+              
+      Try 
+      {
+        Invoke-WebRequest -Uri ($CSVDataSet.url) -TimeoutSec 20 -OutFile $CsvFilename -Proxy $ProxyURL #-PassThru
+        Write-Log -Message 'CSV file downloaded.' -severity 2
+      }
+      Catch 
+      {
+        Write-Log -Message 'An error occurred attempting to download CSV files automatically' -severity 3
+        Write-Log -Message "Download the file from the URI below, name it $($CSVDataSet.filename) and place it in the same folder as this script" -severity 3
+        Write-Log -Message "$($CSVDataSet.url)" 
+        Throw ('Problem retrieving CSV file {0}' -f $error[0])
+        Exit 1
+      }
+    }
+
+    #We should have good CSV files
+    Try 
+    {
+      $csvdata = Import-CSV -Path $CsvFilename
+      $CSVCount = ($CSVData.Count)
+      Write-Log -Message "Imported file with $CSVCount event tags"  -severity 2
+      if ($CSVCount -le 10) 
+      {
+        Write-Log -Message 'Downloaded file doesnt appear to contain correct data'  -severity 3
+        throw 'Imported file doesnt appear to contain correct data'
+      }
+                
+    }
+    Catch 
+    {
+      Write-Log -Message 'An error occurred attempting to Import CSV files automatically' -severity 3
+      Write-Log -Message "Download the file from the URI below, name it $($CSVDataSet.filename) and place it in the same folder as this script" -severity 3
+      Write-Log -Message " $($CSVDataSet.url)" 
+      Throw ('Problem retrieving CSV file {0}' -f $error[0])
+      Exit 1
+    }
+  }
+      
+}
+
+
+Function Import-DateData
+{
+  $function = 'Import-DateData'
+  #Import the CSV files and turn them into useful data
+  Write-Log -component $function -Message 'Reading CSV Data and Generating Holiday list' -Severity 2
+  $script:DateData = @()
+  $tempdatedata = @()
+  ForEach ($CSVDataSet in $script:XMLDataSetTable[1,2])
+  {
+    $CsvFilename = (Join-Path -Path $PSScriptRoot -ChildPath ($CSVDataSet.filename))#Filename for the CSV data Set
+    $csvdata = Import-CSV -Path $CsvFilename
+    $tempDateData = ($TempDateData + $csvdata)
+  }
+  
+  #Clean up Data
+  Foreach ($Event in $tempDateData)
+  { 
+    #Check for and fix missing Raw Dates
+    if ($event.'raw date' -eq $null) 
+    {
+      Add-Member -InputObject $event -NotePropertyName 'Raw date' -NotePropertyValue ([datetimeoffset]::parseexact($event.date, 'yyyyMMdd', $null).tounixtimeseconds())
+    }
+    
+    #Add Years to names to make thing easier
+    $Event.'Holiday name' = ("$($Event.'Holiday name') $($Event.date.substring(0,4))")
+    
+    
+    
+    $script:DateData = ($script:DateData + $event)
+  }
+  
+}
 #endregion Functions
 
 
-Write-Log -Message "New-CsRgsAustralianHolidayList.ps1 Version $ScriptVersion" -severity 1
-$culture = (Get-Culture)
-$GMTOffset = (Get-WmiObject -Query 'Select Bias from Win32_TimeZone')
-Write-Log -Message 'Current system culture'
-Write-Log -Message $culture
-Write-Log -Message 'Current Timezone'
-Write-Log -Message $GMTOffset.bias
-Write-Log -Message 'Checking UTC Offset'
-If ($GMTOffset.bias -lt 480) 
+
+#Begin Main
+Write-Log -Message "New-CsRgsAustralianHolidayList.ps1 Version $ScriptVersion" -severity 2
+
+#Log everything important about the enviroment, skip if we are just downloading
+If (!$DownloadOnly)
 {
-  Write-Log -Message 'UTC Base offset less than +8 hours'
-  Write-Log -Message 'Your timezone appears to be misconfigured. This script may not function as expected' -severity 3
-  Pause
+
+  $culture = (Get-Culture)
+  $GMTOffset = (Get-WmiObject -Query 'Select Bias from Win32_TimeZone')
+  Write-Log -Message 'Current system culture'
+  Write-Log -Message $culture
+  Write-Log -Message 'Current Timezone'
+  Write-Log -Message $GMTOffset.bias
+  Write-Log -Message 'Checking UTC Offset'
+  
+ 
+  
+  If ($GMTOffset.bias -lt 480) 
+  {
+    Write-Log -Message 'UTC Base offset less than +8 hours' -Severity 3
+    Write-Log -Message 'Your timezone appears to be misconfigured. This script may not function as expected' -severity 3
+    If (!$Unattended)
+    {
+      #Skip the prompt in unattended mode
+      Pause
+    }
+  }
+
+  $National = $RGSPrepend+'National'
+
+  if ($Unattended) 
+  {
+    $DisableScriptUpdate = $true
+  }
+  if ($RemoveExistingRules -eq $true) 
+  {
+    Write-Log -Message 'RemoveExistingRules parameter set to True. Script will automatically delete existing entries from rules' -severity 3
+    Write-Log -Message 'Pausing for 5 seconds' -severity 2
+    Start-Sleep -Seconds 5
+  }
 }
 
-$National = $RGSPrepend+'National'
 
-if ($Unattended) 
-{
-  $DisableScriptUpdate = $true
-}
-if ($RemoveExistingRules -eq $true) 
-{
-  Write-Log -Message 'RemoveExistingRules parameter set to True. Script will automatically delete existing entries from rules' -severity 3
-  Write-Log -Message 'Pausing for 5 seconds' -severity 1
-  Start-Sleep -Seconds 5
-}
 #Get Proxy Details
 $ProxyURL = Get-IEProxy
-If ( $ProxyURL) 
+If ($ProxyURL) 
 {
-  Write-Log -Message "Using proxy address $ProxyURL" -severity 1
+  Write-Log -Message "Using proxy address $ProxyURL" -severity 2
 }
 Else 
 {
   Write-Log -Message 'No proxy setting detected, using direct connection' -severity 1
 }
 
+#Check for Script update
 if ($DisableScriptUpdate -eq $false) 
 {
   Get-ScriptUpdate
 }
 
-Write-Log -Message 'Importing modules' -severity 1
-#$VerbosePreference="SilentlyContinue" #Stops powershell showing Every cmdlet it imports
-Import-Module -Name Lync
-Import-Module -Name SkypeForBusiness
-#$VerbosePreference="Continue" #Comment out if you dont want to see whats going on
-
-
-
-Write-Log -Message 'Checking for XML file' -severity 1
-
-
-#Check for XML file and download it 
-$SessionCacheValid = $false
-If ( Test-Path -Path $SessionCache) 
+#Import the Skype4B/Lync tools
+If (!$DownloadOnly) 
 {
-  Try 
-  {
-    If ( (Get-ChildItem -Path $SessionCache).LastWriteTime -ge (Get-Date).AddDays( - $MaxCacheAge)) 
-    {
-      Write-Log -Message 'XML file found. Reading data' -severity 1
-      [xml]$XMLdata = Get-Content -Path $SessionCache 
-      $EventCount = ($XMLdata.OuterXml | Select-String -Pattern '<event' -AllMatches)
-      $XMLCount = ($EventCount.Matches.Count)
-      Write-Log -Message "Imported file with $XMLCount event tags"  -severity 1
-      if ($XMLCount -le 10) 
-      {
-        Write-Log -Message 'Imported file doesnt appear to contain correct data'  -severity 1
-        throw 'Imported file doesnt appear to contain correct data'
-      }
-                
-      $SessionCacheValid = $true
-    }
-    Else 
-    {
-      Write-Log -Message 'XML file expired. Will re-download XML from website' -severity 3
-    }
-  }
-  Catch 
-  {
-    Write-Log -Message 'Error reading XML file or XML file invalid - Will re-download' -severity 3
-  }
-}
-If ( -not( $SessionCacheValid)) 
-{
-  Write-Log -Message 'Downloading Date list from Australian Government Website' -severity 1
-  Try 
-  {
-    Invoke-WebRequest -Uri 'https://www.australia.gov.au/about-australia/special-dates-and-events/public-holidays/xml' -TimeoutSec 20 -OutFile $SessionCache -Proxy $ProxyURL #-PassThru
-    Write-Log -Message 'XML file downloaded. Reading data' -severity 1
-
-    [xml]$XMLdata = Get-Content -Path $SessionCache 
-    $EventCount = ($XMLdata.OuterXml | Select-String -Pattern '<event' -AllMatches)
-    $XMLCount = ($EventCount.Matches.Count)
-    Write-Log -Message "Imported file with $XMLCount event tags"  -severity 1
-    if ($XMLCount -le 10) 
-    {
-      Write-Log -Message 'Downloaded file doesnt appear to contain correct data'  -severity 1
-      throw 'Imported file doesnt appear to contain correct data'
-    }
-                
-    $SessionCacheValid = $true
-  }
-  Catch 
-  {
-    Write-Log -Message 'An error occurred attempting to download XML file automatically' -severity 3
-    Write-Log -Message 'Download the file from the URI below, name it "AustralianHolidays.xml" and place it in the same folder as this script' -severity 3
-    Write-Log -Message 'https://www.australia.gov.au/about-australia/special-dates-and-events/public-holidays/xml' -ForegroundColor Blue
-    Throw ('Problem retrieving XML file {0}' -f $error[0])
-    Exit 1
-  }
+  Import-ManagementTools
 }
 
 
+#Check for Data XML file and download it if its out of date / missing
+$script:LoopCheck = 0
+Write-Log -Message 'Checking for XML index file' -severity 2
+Get-XmlFile
 
-Write-Log -Message 'Gathering Front End Pool Data' -severity 1
-$Pools = (Get-CsService -Registrar)
 
+#We have the XML file, now grab the CSV files       
+Write-Log -Message "XML File found. Checking for CSV cache" -severity 2
+Write-Log -Message 'Checking for CSV Files' -severity 1
+
+Get-CSVFiles
+
+Write-Log -Message "CSV cache looks okay" -severity 2
+
+If ($DownloadOnly)
+{
+  Write-Log -Message "Downloads completed. Exiting Script"  -severity 2
+  Exit
+}
+
+
+#Now, turn this into holiday data
+Import-DateData
+
+
+#Now we check the enviroment
+Write-Log -Message 'Gathering Front End Pool Data' -severity 2
+try 
+{
+  $Pools = (Get-CsService -Registrar)
+}
+Catch
+{
+  Write-Log -Message "I couldn't execute Get-CsService correctly" -severity 3
+  Write-Log -Message 'This usualy indicates the Skype4B management tools are missing, the CMS is unavailable, or this PC is not joined to the Skype4B domain' -severity 3
+  Write-Log -Message 'Try running this script again from your management server or FrontEnd' -severity 3
+  Exit
+}
+
+
+#Check for and warn the user if its not being run on an Australian configured server
 Write-Log -Message 'Checking Region Info' -severity 1
 $ConvertTime = $false
 $region = (Get-Culture)
@@ -484,66 +757,74 @@ if ($region.Name -ne 'en-AU')
   Write-Log -Message 'This is due to the way the New-CsRgsHoliday cmdlet processes date strings' -severity 3
   Write-Log -Message 'More information is available at the url below' -severity 3
   Write-Log -Message 'https://docs.microsoft.com/en-us/powershell/module/skype/new-csrgsholiday?view=skype-ps' -severity 3
-  Write-Log -Message 'The script will now prompt you to change regions. If you continue without changing regions I will output everything in US date format and hope for the best.' -severity 3
+  Write-Log -Message 'Your timezone appears to be misconfigured. This script may not function as expected' -severity 3
+  If (!$Unattended)
+  {
+    #Skip the prompt in unattended mode
+   
+    Write-Log -Message 'The script will now prompt you to change regions. If you continue without changing regions I will output everything in US date format and hope for the best.' -severity 3
 
 	
-  #Prompt user to switch culture
-  Write-Log -Message 'prompting user to change region'
-  $title = 'Switch Windows Region?'
-  $Message = 'Update the Windows Region (Culture) to en-AU?'
+    #Prompt user to switch culture
+    Write-Log -Message 'prompting user to change region'
+    $title = 'Switch Windows Region?'
+    $Message = 'Update the Windows Region (Culture) to en-AU? This is not required but is often overlooked when building Aussie servers'
 
-  $yes = New-Object -TypeName System.Management.Automation.Host.ChoiceDescription -ArgumentList '&Yes', `
-  'Changes the Region Settings to en-AU and exits'
+    $yes = New-Object -TypeName System.Management.Automation.Host.ChoiceDescription -ArgumentList '&Yes', `
+    'Changes the Region Settings to en-AU and exits'
 
-  $no = New-Object -TypeName System.Management.Automation.Host.ChoiceDescription -ArgumentList '&No', `
-  'No, I like my date format, please convert the values.'
+    $no = New-Object -TypeName System.Management.Automation.Host.ChoiceDescription -ArgumentList '&No', `
+    'No, I like my date format, please convert the values.'
 
-  $options = [Management.Automation.Host.ChoiceDescription[]]($yes, $no)
+    $options = [Management.Automation.Host.ChoiceDescription[]]($yes, $no)
 
-  $result = $host.ui.PromptForChoice($title, $Message, $options, 0) 
+    $result = $host.ui.PromptForChoice($title, $Message, $options, 0) 
 
-  switch ($result)
-  {
-    0 
+    switch ($result)
     {
-      Write-Log -Message 'Updating System Culture' -severity 1
-      Set-Culture -CultureInfo en-AU
-      Write-Log -Message 'System Culture Updated, Script will exit.' -severity 3
-      Write-Log -Message 'Close any PowerShell windows and run the script again' -severity 3
-      Exit
-    }
-    1 
-    {
-      Write-Log -Message 'Unsupported Region. Setting compatability mode' -severity 3
-      Start-Sleep -Seconds 5
-      $ConvertTime = $true
-    }
+      0 
+      {
+        Write-Log -Message 'Updating System Culture' -severity 1
+        Set-Culture -CultureInfo en-AU
+        Write-Log -Message 'System Culture Updated, Script will exit.' -severity 3
+        Write-Log -Message 'Close any PowerShell windows and run the script again' -severity 3
+        Exit
+      }
+      1 
+      {
+        Write-Log -Message 'Unsupported Region. Setting compatability mode' -severity 3
+        Start-Sleep -Seconds 5
+        $ConvertTime = $true
+      }
 							
+    }
   }
-}
+  Else #We are unattended and dont match the system culture. Assume US date format
+  {
+    Write-Log -Message 'Unsupported Region. Setting compatability mode' -severity 3
+    Start-Sleep -Seconds 5
+    $ConvertTime = $true
+  }
+} #End region check
 
 
-
-
-Write-Log -Message 'Parsing command line parameters' -severity 1
+Write-Log -Message 'Parsing command line parameters' -severity 2
 
 # Detect and deal with null service ID
-
-
 
 If ($ServiceID.length -eq 0) 
 {
   Write-Log -Message 'No ServiceID entered, Searching for valid ServiceID' -severity 3
-  Write-Log -Message 'Looking for Front End Pools' -severity 1
+  Write-Log -Message 'Looking for Front End Pools' -severity 2
   $PoolNumber = ($Pools).count
   if ($PoolNumber -eq 0) 
   { 
-     Write-Log -Message "Couldn't locate any FrontEnd Pools! Aborting script" -severity 3
-     Throw "Couldn't locate RGS pool. Abort script"
-     }
+    Write-Log -Message "Couldn't locate any FrontEnd Pools! Aborting script" -severity 3
+    Throw "Couldn't locate RGS pool. Abort script"
+  }
   if ($PoolNumber -eq 1) 
   { 
-    Write-Log -Message "Only found 1 Front End Pool, $Pools.poolfqdn, Selecting it" -severity 1
+    Write-Log -Message "Only found 1 Front End Pool, $Pools.poolfqdn, Selecting it" -severity 2
     $RGSIDs = (Get-CsRgsConfiguration -Identity $Pools.PoolFqdn)
     $Poolfqdn = $Pools.poolfqdn
     #Prompt user to confirm
@@ -565,7 +846,7 @@ If ($ServiceID.length -eq 0)
     {
       0 
       {
-        Write-Log -Message 'Updating ServiceID parameter' -severity 1
+        Write-Log -Message 'Updating ServiceID parameter' -severity 2
         $ServiceID = $RGSIDs.Identity.tostring()
         $FrontEndPool = $Pools.poolfqdn
       }
@@ -573,8 +854,7 @@ If ($ServiceID.length -eq 0)
       {
         Write-Log -Message "Couldn't Autolocate RGS pool. Aborting script" -severity 3
         Throw "Couldn't Autolocate RGS pool. Abort script"
-      }
-							
+      }				
     }
   }
 	
@@ -582,7 +862,7 @@ If ($ServiceID.length -eq 0)
   Else 
   {
     #More than 1 Pool Detected and the user didnt specify anything
-    Write-Log -Message "Found $PoolNumber Front End Pools" -severity 1
+    Write-Log -Message "Found $PoolNumber Front End Pools" -severity 2
 	
     If ($FrontEndPool.length -eq 0) 
     {
@@ -612,7 +892,7 @@ If ($ServiceID.length -eq 0)
       Write-Host
       Write-Host -Object 'Choose the Front End Pool you wish to use'
       $chosen = Read-Host -Prompt 'Or any other value to quit'
-      Write-Log -Message "User input $chosen" -severity 1
+      Write-Log -Message "User input $chosen" -severity 2
       if ($chosen -notmatch '^\d$') 
       {
         Exit
@@ -631,7 +911,7 @@ If ($ServiceID.length -eq 0)
     }
 
 
-    #User specified the pool at the commandline or we collected it earlier
+    #We should have a Valid front end by now
 		
     Write-Log -Message "Using Front End Pool $FrontEndPool" -severity 1
     $RGSIDs = (Get-CsRgsConfiguration -Identity $FrontEndPool)
@@ -683,18 +963,21 @@ Else
 #We should have a valid service ID by now
 
 #Check for last run flag.
+Write-Log -Message 'Checking to see if we have been run on this pool before' -severity 2
+Write-Log -Message 'If the script errors here, check all your SQL/FE servers are online and accessible' -severity 2
 
-$Lastrun = (Get-CsRgsHolidaySet | where {$_.Name -like "_(dont use)_ Aussie*" -and $_.Ownerpool -like $FrontEndPool} -ErrorAction silentlycontinue)
+$Lastrun = (Get-CsRgsHolidaySet | Where-Object {$_.Name -like "_(dont use)_ Aussie*" -and $_.Ownerpool -like $FrontEndPool} -ErrorAction silentlycontinue)
 If ($Lastrun) {
-     Write-Log -Message 'Looks like we have been run on this pool before' -severity 1
-     Write-Log -Message "Found existing RGS Object $($lastrun.name)" -severity 1
-     }
+  Write-Log -Message 'Looks like we have been run on this pool before, thankyou' -severity 2
+  Write-Log -Message "Found existing RGS Object $($lastrun.name)" -severity 1
+}
     
 
-Write-Log -Message 'Parsing XML data' -severity 1
-foreach ($State in $XMLdata.ausgovEvents.jurisdiction) 
+Write-Log -Message 'Parsing CSV data' -severity 2
+$states = 'ACT','NSW','NT','QLD','SA','TAS','VIC','WA'
+foreach ($State in $states) 
 {
-  switch ($State.jurisdictionName) 
+  switch ($State) 
   { 
     'ACT' 
     {
@@ -748,56 +1031,57 @@ foreach ($State in $XMLdata.ausgovEvents.jurisdiction)
 
   Write-Log -Message "Processing events in $StateName" -severity 1
   #Find and clear the existing RGS Object
-  try 
+  Try 
   {
-    Write-Log -Message "Checking for existing $StateName Holiday Set" -severity 1
-    $holidayset = (Get-CsRgsHolidaySet -Name "$StateName" | where {$_.ownerpool -like $FrontEndPool})
-    Write-Log -Message "Removing old entries from $StateName" -severity 1
+    Write-Log -Message "Checking for existing $StateName Holiday Set" -severity 2
+    $holidayset = (Get-CsRgsHolidaySet -Name "$StateName" | Where-Object {$_.ownerpool -like $FrontEndPool})
+    Write-Log -Message "Removing old entries from $StateName" -severity 2
     $holidayset.HolidayList.clear()
-    Write-Log -Message "Existing entries from Holiday Set $StateName removed" -severity 1
+    Write-Log -Message "Existing entries from Holiday Set $StateName removed" -severity 2
   }
-  catch 
+  Catch 
   {
-    Write-Log -Message "Didnt find $StateName Holiday Set. Creating" -severity 1
+    Write-Log -Message "Didnt find $StateName Holiday Set. Creating" -severity 2
     $PlaceholderDate = (New-CsRgsHoliday -StartDate '11/11/1970 12:00 AM' -EndDate '12/11/1970 12:00 AM' -Name 'Placeholder. Shouldnt Exist')
     $holidayset = (New-CsRgsHolidaySet -Parent $ServiceID -Name "$StateName" -HolidayList $PlaceholderDate -ErrorAction silentlycontinue)
-    Write-Log -Message 'Removing Placeholder Date' -severity 1
+    Write-Log -Message 'Removing Placeholder Date' -severity 2
     $holidayset.HolidayList.clear()            
   }
  
   #Process Events in that State
-  foreach ($event in $XMLdata.ausgovEvents.jurisdiction[$StateID].events.event)
+  foreach ($event in ($script:DateData | Where-Object {$_.Jurisdiction -eq $state}))
   {
     #Deal with Unix date format
     $udate = Get-Date -Date '1/1/1970'
     if ($ConvertTime) 
     {
       #American Date format
-      $StartDate = ($udate.AddSeconds($event.rawDate).ToLocalTime() | Get-Date -Format MM/dd/yyyy)
-      $EndDate = ($udate.AddSeconds(([int]$event.rawDate+86400)).ToLocalTime() | Get-Date -Format MM/dd/yyyy)     
+      $StartDate = ($udate.AddSeconds($event.'Raw Date').ToLocalTime() | Get-Date -Format MM/dd/yyyy)
+      $EndDate = ($udate.AddSeconds(([int]$event.'Raw Date'+86400)).ToLocalTime() | Get-Date -Format MM/dd/yyyy)     
     }
     else 
     {
       #Aussie Date format
-      $StartDate = ($udate.AddSeconds($event.rawDate).ToLocalTime() | Get-Date -Format dd/MM/yyyy)
-      $EndDate = ($udate.AddSeconds(([int]$event.rawDate+86400)).ToLocalTime() | Get-Date -Format dd/MM/yyyy)
+      $StartDate = ($udate.AddSeconds($event.'Raw Date').ToLocalTime() | Get-Date -Format dd/MM/yyyy)
+      $EndDate = ($udate.AddSeconds(([int]$event.'Raw Date'+86400)).ToLocalTime() | Get-Date -Format dd/MM/yyyy)
     }
 
     #Create the event in Skype format
-    $EventName = ($event.holidayTitle)      
+    $EventName = ($event.'Holiday Name')      
     $EventName = ($EventName -replace '  ' , ' ') #Remove Double Spaces in eventname
     $EventName = $EventName.Trim()		  #Remove any leading or trailing whitespace
     $CurrentEvent = (New-CsRgsHoliday -StartDate "$StartDate 12:00 AM" -EndDate "$EndDate 12:00 AM" -Name "$StateName $EventName")
     #$CurrentEvent
     #add it to the variable.
-    Write-Log -Message "Adding $EventName to $StateName" -severity 1
+    Write-Log -Message "Adding $EventName to $StateName" -severity 2
     $holidayset.HolidayList.Add($CurrentEvent)
   }
-  Write-Log -Message 'Finished adding events' -severity 1
-  Write-Log -Message "Writing $StateName to Database" -severity 1
+  Write-Log -Message 'Finished adding events' -severity 2
+  Write-Log -Message "Writing $StateName to Database" -severity 2
   Try 
   {
     Set-CsRgsHolidaySet -Instance $holidayset
+    Write-Log -Message "Write OK!" -severity 2
   }
 
   Catch 
@@ -815,24 +1099,24 @@ foreach ($State in $XMLdata.ausgovEvents.jurisdiction)
 
 try 
 {
-  Write-Log -Message "Checking for existing $National Holiday Set" -severity 1
-  $holidayset = (Get-CsRgsHolidaySet -Name "$National" | where {$_.ownerpool -like $FrontEndPool})
-  Write-Log -Message "Removing old entries from $National" -severity 1
+  Write-Log -Message "Checking for existing $National Holiday Set" -severity 2
+  $holidayset = (Get-CsRgsHolidaySet -Name "$National" | Where-Object {$_.ownerpool -like $FrontEndPool})
+  Write-Log -Message "Removing old entries from $National" -severity 2
   $holidayset.HolidayList.clear()
-  Write-Log -Message "Existing entries from Holiday Set $National removed" -severity 1
+  Write-Log -Message "Existing entries from Holiday Set $National removed" -severity 2
 }
 catch 
 {
-  Write-Log -Message "Didnt find $National Holiday Set. Creating" -severity 1
+  Write-Log -Message "Didnt find $National Holiday Set. Creating" -severity 2
   $PlaceholderDate = (New-CsRgsHoliday -StartDate '11/11/1970 12:00 AM' -EndDate '12/11/1970 12:00 AM' -Name 'Placeholder. Shouldnt Exist')
   $holidayset = (New-CsRgsHolidaySet -Parent $ServiceID -Name "$National" -HolidayList $PlaceholderDate -ErrorAction silentlycontinue)
-  Write-Log -Message 'Removing Placeholder Date' -severity 1
+  Write-Log -Message 'Removing Placeholder Date' -severity 2
   $holidayset.HolidayList.clear()            
 }
 
 #Find dates that are in every state
 
-Write-Log -Message 'Finding National Holidays (This can take a while)' -severity 1
+Write-Log -Message 'Finding National Holidays (This can take a while)' -severity 2
 $i = 0
 $RawNatHolidayset = $null
 $NatHolidayset = $null
@@ -842,19 +1126,18 @@ $RawNatHolidayset = @()
 foreach ($State in $XMLdata.ausgovEvents.jurisdiction) 
 {
   #Process Events in that State
-  foreach ($event in $XMLdata.ausgovEvents.jurisdiction[$i].events.event) 
+  $states = 'ACT','NSW','NT','QLD','SA','TAS','VIC','WA'
+  foreach ($State in $states) 
   {
     $RawNatHolidayset += ($event)
   }
   $i ++
 }
 
-$NatHolidayset = ($RawNatHolidayset | Sort-Object -Property rawDate -Unique)
+$NatHolidayset = ($script:DateData | Sort-Object -Property 'raw Date' -Unique)
 ForEach($Uniquedate in $NatHolidayset)
 {
-  $SEARCH_RESULT = $RawNatHolidayset|Where-Object -FilterScript {
-    $_.rawDate -eq $Uniquedate.rawdate
-  }
+  $SEARCH_RESULT = $script:DateData|Where-Object -FilterScript {$_.'raw Date' -eq $Uniquedate.'raw date'}
 
   if ( $SEARCH_RESULT.Count -eq 8)
   {      
@@ -866,32 +1149,32 @@ ForEach($Uniquedate in $NatHolidayset)
     if ($ConvertTime) 
     {
       #American Date format
-      $StartDate = ($udate.AddSeconds($event.rawDate).ToLocalTime() | Get-Date -Format MM/dd/yyyy)
-      $EndDate = ($udate.AddSeconds(([int]$event.rawDate+86400)).ToLocalTime() | Get-Date -Format MM/dd/yyyy)     
+      $StartDate = ($udate.AddSeconds($event.'Raw Date').ToLocalTime() | Get-Date -Format MM/dd/yyyy)
+      $EndDate = ($udate.AddSeconds(([int]$event.'Raw Date'+86400)).ToLocalTime() | Get-Date -Format MM/dd/yyyy)     
     }
     else 
     {
       #Aussie Date format
-      $StartDate = ($udate.AddSeconds($event.rawDate).ToLocalTime() | Get-Date -Format dd/MM/yyyy)
-      $EndDate = ($udate.AddSeconds(([int]$event.rawDate+86400)).ToLocalTime() | Get-Date -Format dd/MM/yyyy)
+      $StartDate = ($udate.AddSeconds($event.'Raw Date').ToLocalTime() | Get-Date -Format dd/MM/yyyy)
+      $EndDate = ($udate.AddSeconds(([int]$event.'Raw Date'+86400)).ToLocalTime() | Get-Date -Format dd/MM/yyyy)
     }
                                  
     #Create the event in Skype format
-    Write-Log -Message "Found $EventName" -severity 1
-    $EventName = ($event.holidayTitle)
+    Write-Log -Message "Found $EventName" -severity 2
+    $EventName = ($event.'Holiday Name')
     $EventName = ($EventName -replace '  ' , ' ') #Remove Double Spaces in eventname
     $EventName = $EventName.Trim()		  #Remove any leading or trailing whitespace
     $CurrentEvent = (New-CsRgsHoliday -StartDate "$StartDate 12:00 AM" -EndDate "$EndDate 12:00 AM" -Name "$StateName $EventName")
     $holidayset.HolidayList.Add($CurrentEvent)
   }
 }
-Write-Log -Message 'Finished adding events' -severity 1
-Write-Log -Message "Writing $National to Database" -severity 1
+Write-Log -Message 'Finished adding events' -severity 2
+Write-Log -Message "Writing $National to Database" -severity 2
 Try 
 {
   #Update Database  
   Set-CsRgsHolidaySet -Instance $holidayset
-
+  Write-Log -Message "Write OK!" -severity 2
 
 }
 Catch 
@@ -903,28 +1186,113 @@ Catch
   Throw $ErrorMessage
 }
 
-  #Update Last Run Flag
-  Write-Log -Message "Updating Last Run Holiday Set" -severity 1
-  if ($Lastrun) {
-        Get-CsRgsHolidaySet | where {$_.Name -like "_(dont use)_ Aussie*" -and $_.Ownerpool -like $FrontEndPool} | Remove-CsRgsHolidaySet
-    }
-  #Write a new Last Run Flag
-    $ShortDate = (Get-Date -Format dd/MM/yyyy)  
-    $PlaceholderDate = (New-CsRgsHoliday -StartDate '11/11/1970 12:00 AM' -EndDate '12/11/1970 12:00 AM' -Name '_(Dont Use)_ Aussie Holidays updated on 5/11/2018 by New-CsRgsAustralianHolidayList http://bit.ly/CsRgsAU')
-    [void] (New-CsRgsHolidaySet -Parent $ServiceID -Name "_(Dont Use)_ Aussie Holidays updated on $ShortDate by New-CsRgsAustralianHolidayList http://bit.ly/CsRgsAU" -HolidayList $PlaceholderDate)
-    Write-Log -Message "Last Run Flag Updated" -severity 1
+#Update Last Run Flag
+Write-Log -Message "Updating Last Run Holiday Set" -severity 2
+if ($Lastrun) {
+  Get-CsRgsHolidaySet | Where-Object {$_.Name -like "_(dont use)_ Aussie*" -and $_.Ownerpool -like $FrontEndPool} | Remove-CsRgsHolidaySet
+}
+#Write a new Last Run Flag
+$ShortDate = (Get-Date -Format dd/MM/yyyy)  
+$PlaceholderDate = (New-CsRgsHoliday -StartDate '11/11/1970 12:00 AM' -EndDate '12/11/1970 12:00 AM' -Name "_(Dont Use)_ Aussie Holidays updated on $ShortDate by New-CsRgsAustralianHolidayList http://bit.ly/CsRgsAU UcMadScientist")
+[void] (New-CsRgsHolidaySet -Parent $ServiceID -Name "_(Dont Use)_ Aussie Holidays updated on $ShortDate by New-CsRgsAustralianHolidayList http://bit.ly/CsRgsAU" -HolidayList $PlaceholderDate)
+Write-Log -Message "Last Run Flag Updated" -severity 2
 
 #Find display the last holiday imported
 
 Write-Host ''
 Write-Host ''
-$LastDate = ($NatHolidayset | select -Last 1 date).date.tostring()
-$FirstDate = ($NatHolidayset | select -First 1 date).date.tostring()
-Write-Log -Message 'Looks like everything went okay. Here are your current RGS Holiday Sets' -severity 1
+$LastDate = (($script:DateData | Sort-Object -Property 'raw Date' -Unique | select-Object -Last 1).date )
+$LastDate = ([datetimeoffset]::parseexact($LastDate, 'yyyyMMdd', $null)).tostring("D") 
+$FirstDate = (($script:DateData | Sort-Object -Property 'raw Date' -Unique | select-Object -First 1).date )
+$FirstDate = ([datetimeoffset]::parseexact($FirstDate, 'yyyyMMdd', $null)).tostring("D") 
+$ReRunDate = (($script:DateData | Sort-Object -Property 'raw Date' -Unique | select-Object -Last 1).date )
+$ReRunDate = ([datetimeoffset]::parseexact($ReRunDate, 'yyyyMMdd', $null)).tostring("Y") 
+Write-Log -Message 'Looks like everything went okay. Here are your current RGS Holiday Sets' -severity 2
 Get-CsRgsHolidaySet | Select-Object -Property OwnerPool, Name | Format-Table
 
 Write-Host ''
 Write-Host ''
-Write-Log -Message "Imported $XMLCount events between $Firstdate and $LastDate. You will need to re-run this script before $LastDate." -severity 2
+Write-Log -Message "Imported $($script:DateData.count) events between $Firstdate and $LastDate. You will need to re-run this script before $ReRunDate" -severity 2
 
 
+Write-Host ''
+Write-Host ''
+Write-Host "Did this script help you? Save you some time? I'd REALLY appreciate it if you voted for it in the TechNet Gallery or if you tweeted about it" -ForegroundColor Cyan -BackgroundColor Black
+Write-Host "It only takes a few moments and helps give me the tools to continue developing these tools for you!" -ForegroundColor Cyan -BackgroundColor Black
+Write-Host "TechNet Gallery: https://gallery.technet.microsoft.com/Australian-RGSResponse-22845230?redir=0" -ForegroundColor Cyan -BackgroundColor Black
+Write-Host "URL to Share: http://bit.ly/CsRgsAU" -ForegroundColor Cyan -BackgroundColor Black
+
+
+
+# SIG # Begin signature block
+# MIINFwYJKoZIhvcNAQcCoIINCDCCDQQCAQExCzAJBgUrDgMCGgUAMGkGCisGAQQB
+# gjcCAQSgWzBZMDQGCisGAQQBgjcCAR4wJgIDAQAABBAfzDtgWUsITrck0sYpfvNR
+# AgEAAgEAAgEAAgEAAgEAMCEwCQYFKw4DAhoFAAQURDpibFi/vKsXpVNHC1jqKZJC
+# X6mgggpZMIIFITCCBAmgAwIBAgIQD274plv3rQv2N1HXnqk5jzANBgkqhkiG9w0B
+# AQsFADByMQswCQYDVQQGEwJVUzEVMBMGA1UEChMMRGlnaUNlcnQgSW5jMRkwFwYD
+# VQQLExB3d3cuZGlnaWNlcnQuY29tMTEwLwYDVQQDEyhEaWdpQ2VydCBTSEEyIEFz
+# c3VyZWQgSUQgQ29kZSBTaWduaW5nIENBMB4XDTIwMDEwNTAwMDAwMFoXDTIyMDky
+# ODEyMDAwMFowXjELMAkGA1UEBhMCQVUxETAPBgNVBAgTCFZpY3RvcmlhMRAwDgYD
+# VQQHEwdCZXJ3aWNrMRQwEgYDVQQKEwtKYW1lcyBBcmJlcjEUMBIGA1UEAxMLSmFt
+# ZXMgQXJiZXIwggEiMA0GCSqGSIb3DQEBAQUAA4IBDwAwggEKAoIBAQCVq3KHhsUn
+# G0iP8Xv+EIRGhPEqceUcmXftvbWSXoEL+w8h79PVn9WZawPgyDlmAZvzlAWaPGSu
+# tW7z0/XqkewTjFI4em2BxIsLr3enoB/OuBM11ktZVaMYWOHaUexj8CioBeoFTGYg
+# H98cmoo6i3xQcBbFJauJcgAI8jDTTDHM1bvDE9ItyeTr63MGJx1rob4KXCr0Oi9R
+# MVtk/TDVCNjG3IdK8dnrpKUE7s2grAiPJ2tmNkrk3R2pSRl1qx3d01LWKcV2tv4s
+# fbWLCwdz2HVTdevl7PjhwUPhuLZVj/EctCiU+5UDDtAIIIvQ9uvbFngmF0QmE9Yb
+# W1bgiyfr5GmFAgMBAAGjggHFMIIBwTAfBgNVHSMEGDAWgBRaxLl7KgqjpepxA8Bg
+# +S32ZXUOWDAdBgNVHQ4EFgQUX+77NtBOxF+2arVa8Srnig2A/ocwDgYDVR0PAQH/
+# BAQDAgeAMBMGA1UdJQQMMAoGCCsGAQUFBwMDMHcGA1UdHwRwMG4wNaAzoDGGL2h0
+# dHA6Ly9jcmwzLmRpZ2ljZXJ0LmNvbS9zaGEyLWFzc3VyZWQtY3MtZzEuY3JsMDWg
+# M6Axhi9odHRwOi8vY3JsNC5kaWdpY2VydC5jb20vc2hhMi1hc3N1cmVkLWNzLWcx
+# LmNybDBMBgNVHSAERTBDMDcGCWCGSAGG/WwDATAqMCgGCCsGAQUFBwIBFhxodHRw
+# czovL3d3dy5kaWdpY2VydC5jb20vQ1BTMAgGBmeBDAEEATCBhAYIKwYBBQUHAQEE
+# eDB2MCQGCCsGAQUFBzABhhhodHRwOi8vb2NzcC5kaWdpY2VydC5jb20wTgYIKwYB
+# BQUHMAKGQmh0dHA6Ly9jYWNlcnRzLmRpZ2ljZXJ0LmNvbS9EaWdpQ2VydFNIQTJB
+# c3N1cmVkSURDb2RlU2lnbmluZ0NBLmNydDAMBgNVHRMBAf8EAjAAMA0GCSqGSIb3
+# DQEBCwUAA4IBAQCfGaBR90KcYBczv5tVSBquFD0rP4h7oEE8ik+EOJQituu3m/nv
+# X+fG8h8f8+cG+0O55g+P/iGPS1Uo/BUEKjfUvLQjg9gJN7ZZozqP5xU7pn270rFd
+# chmu/vkSGh4waYoASiqJXvkQbVZcxV72j3+RBD1jsmgP05WaKMT5l9VZwGedVn40
+# FHNarFpJoCsyQn6sQInWdDfi6X2cYi0x4U0ogWYYyR8bhBUlt6RhevYn6EfqHgV3
+# oEZ7qwxApjyGpQIwwQUEs60/tO7bkH1futFDdogzsXFJO3cS9OykctpBucaPDrkH
+# 1AcqMqpWVRcXGebpOHnW5zPoGFG9JblyuwBZMIIFMDCCBBigAwIBAgIQBAkYG1/V
+# u2Z1U0O1b5VQCDANBgkqhkiG9w0BAQsFADBlMQswCQYDVQQGEwJVUzEVMBMGA1UE
+# ChMMRGlnaUNlcnQgSW5jMRkwFwYDVQQLExB3d3cuZGlnaWNlcnQuY29tMSQwIgYD
+# VQQDExtEaWdpQ2VydCBBc3N1cmVkIElEIFJvb3QgQ0EwHhcNMTMxMDIyMTIwMDAw
+# WhcNMjgxMDIyMTIwMDAwWjByMQswCQYDVQQGEwJVUzEVMBMGA1UEChMMRGlnaUNl
+# cnQgSW5jMRkwFwYDVQQLExB3d3cuZGlnaWNlcnQuY29tMTEwLwYDVQQDEyhEaWdp
+# Q2VydCBTSEEyIEFzc3VyZWQgSUQgQ29kZSBTaWduaW5nIENBMIIBIjANBgkqhkiG
+# 9w0BAQEFAAOCAQ8AMIIBCgKCAQEA+NOzHH8OEa9ndwfTCzFJGc/Q+0WZsTrbRPV/
+# 5aid2zLXcep2nQUut4/6kkPApfmJ1DcZ17aq8JyGpdglrA55KDp+6dFn08b7KSfH
+# 03sjlOSRI5aQd4L5oYQjZhJUM1B0sSgmuyRpwsJS8hRniolF1C2ho+mILCCVrhxK
+# hwjfDPXiTWAYvqrEsq5wMWYzcT6scKKrzn/pfMuSoeU7MRzP6vIK5Fe7SrXpdOYr
+# /mzLfnQ5Ng2Q7+S1TqSp6moKq4TzrGdOtcT3jNEgJSPrCGQ+UpbB8g8S9MWOD8Gi
+# 6CxR93O8vYWxYoNzQYIH5DiLanMg0A9kczyen6Yzqf0Z3yWT0QIDAQABo4IBzTCC
+# AckwEgYDVR0TAQH/BAgwBgEB/wIBADAOBgNVHQ8BAf8EBAMCAYYwEwYDVR0lBAww
+# CgYIKwYBBQUHAwMweQYIKwYBBQUHAQEEbTBrMCQGCCsGAQUFBzABhhhodHRwOi8v
+# b2NzcC5kaWdpY2VydC5jb20wQwYIKwYBBQUHMAKGN2h0dHA6Ly9jYWNlcnRzLmRp
+# Z2ljZXJ0LmNvbS9EaWdpQ2VydEFzc3VyZWRJRFJvb3RDQS5jcnQwgYEGA1UdHwR6
+# MHgwOqA4oDaGNGh0dHA6Ly9jcmw0LmRpZ2ljZXJ0LmNvbS9EaWdpQ2VydEFzc3Vy
+# ZWRJRFJvb3RDQS5jcmwwOqA4oDaGNGh0dHA6Ly9jcmwzLmRpZ2ljZXJ0LmNvbS9E
+# aWdpQ2VydEFzc3VyZWRJRFJvb3RDQS5jcmwwTwYDVR0gBEgwRjA4BgpghkgBhv1s
+# AAIEMCowKAYIKwYBBQUHAgEWHGh0dHBzOi8vd3d3LmRpZ2ljZXJ0LmNvbS9DUFMw
+# CgYIYIZIAYb9bAMwHQYDVR0OBBYEFFrEuXsqCqOl6nEDwGD5LfZldQ5YMB8GA1Ud
+# IwQYMBaAFEXroq/0ksuCMS1Ri6enIZ3zbcgPMA0GCSqGSIb3DQEBCwUAA4IBAQA+
+# 7A1aJLPzItEVyCx8JSl2qB1dHC06GsTvMGHXfgtg/cM9D8Svi/3vKt8gVTew4fbR
+# knUPUbRupY5a4l4kgU4QpO4/cY5jDhNLrddfRHnzNhQGivecRk5c/5CxGwcOkRX7
+# uq+1UcKNJK4kxscnKqEpKBo6cSgCPC6Ro8AlEeKcFEehemhor5unXCBc2XGxDI+7
+# qPjFEmifz0DLQESlE/DmZAwlCEIysjaKJAL+L3J+HNdJRZboWR3p+nRka7LrZkPa
+# s7CM1ekN3fYBIM6ZMWM9CBoYs4GbT8aTEAb8B4H6i9r5gkn3Ym6hU/oSlBiFLpKR
+# 6mhsRDKyZqHnGKSaZFHvMYICKDCCAiQCAQEwgYYwcjELMAkGA1UEBhMCVVMxFTAT
+# BgNVBAoTDERpZ2lDZXJ0IEluYzEZMBcGA1UECxMQd3d3LmRpZ2ljZXJ0LmNvbTEx
+# MC8GA1UEAxMoRGlnaUNlcnQgU0hBMiBBc3N1cmVkIElEIENvZGUgU2lnbmluZyBD
+# QQIQD274plv3rQv2N1HXnqk5jzAJBgUrDgMCGgUAoHgwGAYKKwYBBAGCNwIBDDEK
+# MAigAoAAoQKAADAZBgkqhkiG9w0BCQMxDAYKKwYBBAGCNwIBBDAcBgorBgEEAYI3
+# AgELMQ4wDAYKKwYBBAGCNwIBFTAjBgkqhkiG9w0BCQQxFgQU27VgEfzSwJAz4omo
+# 64LGtp0samUwDQYJKoZIhvcNAQEBBQAEggEAUU5xdCPXYXooMlYPhXn9FIDdIQf+
+# n/rdYxriVCIcxjelK8sITsexHzaj/fGWx6olo7ixIvES33iYR+5HygBeqeWM76r+
+# 5ZSaFgtIN/eh1ONrTkTWt5guyDf+CEmzgIxUKUITwnWAe2F0MR2hM5ZIUX6WWLSb
+# cr0ITpPfMD2HfooFHVgPZCSb/YPH7clNPzAnZEH7McYETULq+RrYuLzuUzk0xEcA
+# jG8yub7mRm0QMw0FS790mNCbKBT/bHSNcJ7HUbGj0Xxi9iy45WzkNiLDRmsaFOu6
+# dtLVV9QGtCCQ8j6a5O1wDQgjv8xGcnXvrl2/MlcmlmEuszEE46WzYp8TIA==
+# SIG # End signature block
