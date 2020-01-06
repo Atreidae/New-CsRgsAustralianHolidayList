@@ -3,7 +3,7 @@ This script creates RGS holidaysets for Australian states based on live data fro
 
 
 ## DESCRIPTION  
-Created by James Arber. www.skype4badmin.com
+Created by James Arber. UcMadScientist.com
 
 Although every effort has been made to ensure this list is correct, dates change and sometimes I goof. 
 Please use at your own risk.
@@ -95,7 +95,7 @@ Header stolen from    : Greig Sheridan who stole it from Pat Richard's amazing "
 
 
 ## LINK  
-[http://www.skype4badmin.com/australian-holiday-rulesets-for-response-group-service/](http://www.skype4badmin.com/australian-holiday-rulesets-for-response-group-service/)
+[http://www.UcMadScientist.com/australian-holiday-rulesets-for-response-group-service/](https://www.UcMadScientist.com/australian-holiday-rulesets-for-response-group-service/)
 
 ## KNOWN ISSUES
    None at this stage, this is however in development code and bugs are expected
@@ -165,7 +165,6 @@ Pat Richard http://www.ehloworld.com @patrichard
 
 ### Proxy Detection
 Michel de Rooij	http://eightwone.com
-
 
 ### Testing 
 Sean Werner https://www.linkedin.com/in/sean-werner-88ab126b/ @swerner1k
