@@ -1237,13 +1237,11 @@ Write-Host "It only takes a few moments and helps give me the tools to continue 
 Write-Host "TechNet Gallery: https://gallery.technet.microsoft.com/Australian-RGSResponse-22845230?redir=0" -ForegroundColor Cyan -BackgroundColor Black
 Write-Host "URL to Share: http://bit.ly/CsRgsAU" -ForegroundColor Cyan -BackgroundColor Black
 
-
-
 # SIG # Begin signature block
 # MIINFwYJKoZIhvcNAQcCoIINCDCCDQQCAQExCzAJBgUrDgMCGgUAMGkGCisGAQQB
 # gjcCAQSgWzBZMDQGCisGAQQBgjcCAR4wJgIDAQAABBAfzDtgWUsITrck0sYpfvNR
-# AgEAAgEAAgEAAgEAAgEAMCEwCQYFKw4DAhoFAAQU/BF448ryg955E+PffDxd0UAA
-# kPCgggpZMIIFITCCBAmgAwIBAgIQD274plv3rQv2N1HXnqk5jzANBgkqhkiG9w0B
+# AgEAAgEAAgEAAgEAAgEAMCEwCQYFKw4DAhoFAAQUV9941m469xo0Cpxb8QdkwUv0
+# c7ugggpZMIIFITCCBAmgAwIBAgIQD274plv3rQv2N1HXnqk5jzANBgkqhkiG9w0B
 # AQsFADByMQswCQYDVQQGEwJVUzEVMBMGA1UEChMMRGlnaUNlcnQgSW5jMRkwFwYD
 # VQQLExB3d3cuZGlnaWNlcnQuY29tMTEwLwYDVQQDEyhEaWdpQ2VydCBTSEEyIEFz
 # c3VyZWQgSUQgQ29kZSBTaWduaW5nIENBMB4XDTIwMDEwNTAwMDAwMFoXDTIyMDky
@@ -1303,11 +1301,11 @@ Write-Host "URL to Share: http://bit.ly/CsRgsAU" -ForegroundColor Cyan -Backgrou
 # MC8GA1UEAxMoRGlnaUNlcnQgU0hBMiBBc3N1cmVkIElEIENvZGUgU2lnbmluZyBD
 # QQIQD274plv3rQv2N1HXnqk5jzAJBgUrDgMCGgUAoHgwGAYKKwYBBAGCNwIBDDEK
 # MAigAoAAoQKAADAZBgkqhkiG9w0BCQMxDAYKKwYBBAGCNwIBBDAcBgorBgEEAYI3
-# AgELMQ4wDAYKKwYBBAGCNwIBFTAjBgkqhkiG9w0BCQQxFgQURW2WYrorkDak10CC
-# QXvhPn9il90wDQYJKoZIhvcNAQEBBQAEggEANQBUCRiSL17b8LQzpYEF9Rd1DlRK
-# ie61zJm1sA/ABVO9HTKAnKzY61U9Mb48PHLrtyerobV8ueoI3X9UmAVbA/660M5k
-# tpV2R0aIq9hwqC0teRG5n5o6ztwsyZLpDE6X+dxkFR+Zli67aw50Qavu8lAIhJbe
-# imFY5nbBum6ic2svStc3MMr0D8QT3M9l4g8xFSvslXPJ9hHehCllBWBQnnlcI15x
-# 5CehCUzytUfoSY1x2cc5uPOEW40WP+S9odgYJtF2AdXKs+ikupnac4gj/brUANUG
-# DDPGflg6e0WIKvogR3YJmpxjSaMT9DSf/4UNfcz2d99jY9n7Mgwgmvj0tA==
+# AgELMQ4wDAYKKwYBBAGCNwIBFTAjBgkqhkiG9w0BCQQxFgQUZUbCfg3+8egU8oVa
+# ZJf/HT9JVMQwDQYJKoZIhvcNAQEBBQAEggEAiCXdyrGbPTbmfLTpLGk4yqbgbUJ/
+# ESYkKY15qIxh+E9BtFVixq5LA6bms+erCqvB4p/o2gV5aOdJdQJn7qYJzIRp0XDO
+# SXN2Ajljuo/1QPyV0A0TrctikwD5gR6gZGo9usMRiU7wTLT4hOM+8vH3A2ew9LkV
+# O/NMRoUdZvcWto5nppAKEnZedXS5CLWfZyyWWQk7IXVyHvrxUqxBn79s/V7wj9zB
+# XBsJu82G8+cGHO7Qte3nu2DTdPcZnRoSmbHN0dUAMbCHA381cQQSDsZPQuEbIfKF
+# DUwkTrc0UxLWsCDHvoeLWMztGslqXyW5Cph6ihNCThDIHvb2YaYqzjDm0Q==
 # SIG # End signature block
