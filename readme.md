@@ -16,7 +16,7 @@ Version  	          : 3.0
 
 Date      			  : 6/01/2018
 
-Lync Version	      : Tested against Skype4B Server 2015 and Lync Server 2013
+Lync Version	      : Tested against Skype4B Server 2019, 2015 and Lync Server 2013
 
 Author    		      : James Arber
 
