@@ -7,6 +7,7 @@
     Created by James Arber. www.skype4badmin.com
     Although every effort has been made to ensure this list is correct, dates change and sometimes I goof.
     Please use at your own risk.
+
     Holiday Data taken from https://data.gov.au/data/dataset/b1bc6077-dadd-4f61-9f8c-002ab2cdff10
 
     .NOTES
@@ -31,6 +32,7 @@
     : Fixed, Sorted a bug with unattended mode not updating the last run flag
 
 
+
     : v2.30: The Feedback Build
     : Added display of dates to logs
     : Added a notification at the end of the script showing the last imported date.
@@ -38,6 +40,8 @@
     : Added RGS Update Time Stamp
     : Added Error handing for 0 FrontEnds
     : Fixed a bug with 1 FrontEnd Pools throwing errors when updating existing holidays
+
+
 
 
     : v2.2: Cleaned Up Code
@@ -194,7 +198,7 @@ If (!$LogFileLocation)
 #region Functions
 Function Write-Log
 {
-  <#
+   <#
       .SYNOPSIS
       Function to output messages to the console based on their severity and create log files
 
@@ -232,6 +236,7 @@ Function Write-Log
       .OUTPUTS
       This function does not create pipelined output
   #>
+
   PARAM
   (
     [Parameter(Mandatory)][String]$Message,
@@ -239,6 +244,7 @@ Function Write-Log
     [int]$Severity = 1,
     [string]$Component = 'Default',
     [switch]$LogOnly
+
   )
   $Date             = Get-Date -Format 'HH:mm:ss'
   $Date2            = Get-Date -Format 'MM-dd-yyyy'
@@ -403,6 +409,7 @@ Function Import-ManagementTools
       Date			          : 31/07/2018
       Lync Version		    : Tested against Skype4B 2015
       Author    			    : James Arber
+
 
       .LINK
       http://www.skype4badmin.com
@@ -820,9 +827,11 @@ If ($ServiceID.length -eq 0)
   $PoolNumber = ($Pools).count
   if ($PoolNumber -eq 0) 
   { 
+
     Write-Log -Message "Couldn't locate any FrontEnd Pools! Aborting script" -severity 3
     Throw "Couldn't locate RGS pool. Abort script"
   }
+
   if ($PoolNumber -eq 1) 
   { 
     Write-Log -Message "Only found 1 Front End Pool, $Pools.poolfqdn, Selecting it" -severity 2
@@ -1206,6 +1215,7 @@ Write-Log -Message "Last Run Flag Updated" -severity 2
 
 Write-Host ''
 Write-Host ''
+
 $LastDate = (($script:DateData | Sort-Object -Property 'raw Date' -Unique | select-Object -Last 1).date )
 $LastDate = ([datetimeoffset]::parseexact($LastDate, 'yyyyMMdd', $null)).tostring("D") 
 $FirstDate = (($script:DateData | Sort-Object -Property 'raw Date' -Unique | select-Object -First 1).date )
