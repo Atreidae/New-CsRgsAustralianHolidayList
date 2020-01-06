@@ -98,7 +98,7 @@ Header stolen from    : Greig Sheridan who stole it from Pat Richard's amazing "
 [http://www.UcMadScientist.com/australian-holiday-rulesets-for-response-group-service/](https://www.UcMadScientist.com/australian-holiday-rulesets-for-response-group-service/)
 
 ## KNOWN ISSUES
-   None at this stage, this is however in development code and bugs are expected
+   Re-Running the script twice in one day can throw errors about duplicate entries when updating the last run flag
 
 ## Script Specifics
 
