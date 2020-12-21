@@ -11,13 +11,19 @@
     Holiday Data taken from https://data.gov.au/data/dataset/b1bc6077-dadd-4f61-9f8c-002ab2cdff10
 
     .NOTES
-    Version             : 3.0
-    Date                : 06/01/2020
+    Version             : 3.1
+    Date                : 21/12/2020
     Lync Version        : Tested against Skype4B Server 2015 and Lync Server 2013
     Author              : James Arber
     Header stolen from  : Greig Sheridan who stole it from Pat Richard's amazing "Get-CsConnections.ps1"
 
     Revision History
+
+
+
+    : v3.1: The 2020 is almost over build
+    : Fixed, No longer removes old holidays to prevent manual holidays being stripped. Pointed out by Liam over at Qtec (www.qtec.com.au)
+    : Updated, Write-Log module is now my modular version which fixes a bug with large logfiles (bigger than 10mb)
 
     : v3.0: The ScoMo holiday build
     : ScoMo takes a holiday and so does the XML data I was using to get accurate dates
@@ -196,97 +202,106 @@ If (!$LogFileLocation)
 
 
 #region Functions
-Function Write-Log
-{
-   <#
-      .SYNOPSIS
-      Function to output messages to the console based on their severity and create log files
+Function Write-Log {
+	<#
+			.SYNOPSIS
+			Function to output messages to the console based on their severity and create log files
 
-      .DESCRIPTION
-      It's a logger.
+			.DESCRIPTION
+			It's a logger.
 
-      .PARAMETER Message
-      The message to write
+			.PARAMETER Message
+			The message to write
 
-      .PARAMETER Path
-      The location of the logfile.
+			.PARAMETER Path
+			The location of the logfile.
 
-      .PARAMETER Severity
-      Sets the severity of the log message, Higher severities will call Write-Warning or Write-Error
+			.PARAMETER Severity
+			Sets the severity of the log message, Higher severities will call Write-Warning or Write-Error
 
-      .PARAMETER Component
-      Used to track the module or function that called "Write-Log" 
+			.PARAMETER Component
+			Used to track the module or function that called "Write-Log" 
 
-      .PARAMETER LogOnly
-      Forces Write-Log to not display anything to the user
+			.PARAMETER LogOnly
+			Forces Write-Log to not display anything to the user
 
-      .EXAMPLE
-      Write-Log -Message 'This is a log message' -Severity 3 -component 'Example Component'
-      Writes a log file message and displays a warning to the user
+			.EXAMPLE
+			Write-Log -Message 'This is a log message' -Severity 3 -component 'Example Component'
+			Writes a log file message and displays a warning to the user
 
-      .NOTES
-      N/A
+			.REQUIRED FUNCTIONS
+			None
 
-      .LINK
-      http://www.UcMadScientist.com
+			.LINK
+			http://www.UcMadScientist.com
+			https://github.com/Atreidae/PowerShell-Fuctions
 
-      .INPUTS
-      This function does not accept pipelined input
+			.INPUTS
+			This function does not accept pipelined input
 
-      .OUTPUTS
-      This function does not create pipelined output
-  #>
+			.OUTPUTS
+			This function does not create pipelined output
 
-  PARAM
-  (
-    [Parameter(Mandatory)][String]$Message,
-    [String]$Path = $script:LogFileLocation,
-    [int]$Severity = 1,
-    [string]$Component = 'Default',
-    [switch]$LogOnly
+			.NOTES
+			Version:		1.1
+			Date:			21/12/2020
 
-  )
-  $Date             = Get-Date -Format 'HH:mm:ss'
-  $Date2            = Get-Date -Format 'MM-dd-yyyy'
-  $MaxLogFileSizeMB = 10
-  
-  If(Test-Path -Path $Path)
-  {
-    if(((Get-ChildItem -Path $Path).length/1MB) -gt $MaxLogFileSizeMB) # Check the size of the log file and archive if over the limit.
-    {
-      $ArchLogfile = $Path.replace('.log', "_$(Get-Date -Format dd-MM-yyy_hh-mm-ss).lo_")
-      Rename-Item -Path ren -NewName $Path -Path $ArchLogfile
-    }
-  }
-         
-  "$env:ComputerName date=$([char]34)$Date2$([char]34) time=$([char]34)$Date$([char]34) component=$([char]34)$Component$([char]34) type=$([char]34)$Severity$([char]34) Message=$([char]34)$Message$([char]34)"| Out-File -FilePath $Path -Append -NoClobber -Encoding default
-  If (!$LogOnly) 
-  {
-    #If LogOnly is set, we dont want to write anything to the screen as we are capturing data that might look bad onscreen
-      
-      
-    #If the log entry is just Verbose (1), output it to verbose
-    if ($Severity -eq 1) 
-    {
-      "$Date $Message"| Write-Verbose
-    }
-      
-    #If the log entry is just informational (2), output it to write-host
-    if ($Severity -eq 2) 
-    {
-      "Info: $Date $Message"| Write-Host -ForegroundColor Green
-    }
-    #If the log entry has a severity of 3 assume it's a warning and write it to write-warning
-    if ($Severity -eq 3) 
-    {
-      "$Date $Message"| Write-Warning
-    }
-    #If the log entry has a severity of 4 or higher, assume it's an error and display an error message (Note, critical errors are caught by throw statements so may not appear here)
-    if ($Severity -ge 4) 
-    {
-      "$Date $Message"| Write-Error
-    }
-  }
+			.VERSION HISTORY
+			1.1: Bug Fix
+				Resolved an issue where large logfiles would attempt to rename themselves to the same name causing errors when logs grew above 10MB
+
+			1.0: Initial Public Release
+	#>
+	[CmdletBinding()]
+	PARAM(
+		[String]$Message,
+		[String]$Path = $Script:LogFileLocation,
+		[int]$Severity = 1,
+		[string]$Component = 'Default',
+		[switch]$LogOnly
+	)
+	$function = 'Write-Log'
+	$Date = Get-Date -Format 'HH:mm:ss'
+	$Date2 = Get-Date -Format 'MM-dd-yyyy'
+	$MaxLogFileSizeMB = 10
+
+	#Check to see if the file exists
+	If(Test-Path -Path $Path)
+	{
+		if(((Get-ChildItem -Path $Path).length/1MB) -gt $MaxLogFileSizeMB) # Check the size of the log file and archive if over the limit.
+		{
+			$ArchLogfile = $Path.replace('.log', "_$(Get-Date -Format dd-MM-yyy_hh-mm-ss).lo_")
+			Rename-Item -Path $Path -NewName $ArchLogfile
+		}
+	}
+
+	#Write to the log file
+	"$env:ComputerName date=$([char]34)$Date2$([char]34) time=$([char]34)$Date$([char]34) component=$([char]34)$component$([char]34) type=$([char]34)$severity$([char]34) Message=$([char]34)$Message$([char]34)"| Out-File -FilePath $Path -Append -NoClobber -Encoding default
+
+	#If LogOnly is not set, output the log entry to the screen
+	If (!$LogOnly) 
+	{
+		#If the log entry is just Verbose (1), output it to write-verbose
+		if ($severity -eq 1) 
+		{
+			"$Message"| Write-verbose
+		}
+		#If the log entry is just informational (2), output it to write-host
+		if ($severity -eq 2) 
+		{
+			"INFO: $Message"| Write-Host -ForegroundColor Green
+		}
+		#If the log entry has a severity of 3 assume its a warning and write it to write-warning
+		if ($severity -eq 3) 
+		{
+			"$Date $Message"| Write-Warning
+		}
+		#If the log entry has a severity of 4 or higher, assume its an error and display an error message (Note, critical errors are caught by throw statements so may not appear here)
+		if ($severity -ge 4) 
+		{
+			"$Date $Message"| Write-Error
+		}
+	}
 }
 
 Function Get-IEProxy 
@@ -1049,8 +1064,8 @@ foreach ($State in $states)
   {
     Write-Log -Message "Checking for existing $StateName Holiday Set" -severity 2
     $holidayset = (Get-CsRgsHolidaySet -Name "$StateName" | Where-Object {$_.ownerpool -like $FrontEndPool})
-    Write-Log -Message "Removing old entries from $StateName" -severity 2
-    $holidayset.HolidayList.clear()
+    #Write-Log -Message "Removing old entries from $StateName" -severity 2
+    #$holidayset.HolidayList.clear()
     Write-Log -Message "Existing entries from Holiday Set $StateName removed" -severity 2
   }
   Catch 
@@ -1240,8 +1255,8 @@ Write-Host "URL to Share: http://bit.ly/CsRgsAU" -ForegroundColor Cyan -Backgrou
 # SIG # Begin signature block
 # MIINFwYJKoZIhvcNAQcCoIINCDCCDQQCAQExCzAJBgUrDgMCGgUAMGkGCisGAQQB
 # gjcCAQSgWzBZMDQGCisGAQQBgjcCAR4wJgIDAQAABBAfzDtgWUsITrck0sYpfvNR
-# AgEAAgEAAgEAAgEAAgEAMCEwCQYFKw4DAhoFAAQUV9941m469xo0Cpxb8QdkwUv0
-# c7ugggpZMIIFITCCBAmgAwIBAgIQD274plv3rQv2N1HXnqk5jzANBgkqhkiG9w0B
+# AgEAAgEAAgEAAgEAAgEAMCEwCQYFKw4DAhoFAAQU8MIIz0NVZcH6rjH70yLy6Biv
+# KcWgggpZMIIFITCCBAmgAwIBAgIQD274plv3rQv2N1HXnqk5jzANBgkqhkiG9w0B
 # AQsFADByMQswCQYDVQQGEwJVUzEVMBMGA1UEChMMRGlnaUNlcnQgSW5jMRkwFwYD
 # VQQLExB3d3cuZGlnaWNlcnQuY29tMTEwLwYDVQQDEyhEaWdpQ2VydCBTSEEyIEFz
 # c3VyZWQgSUQgQ29kZSBTaWduaW5nIENBMB4XDTIwMDEwNTAwMDAwMFoXDTIyMDky
@@ -1301,11 +1316,11 @@ Write-Host "URL to Share: http://bit.ly/CsRgsAU" -ForegroundColor Cyan -Backgrou
 # MC8GA1UEAxMoRGlnaUNlcnQgU0hBMiBBc3N1cmVkIElEIENvZGUgU2lnbmluZyBD
 # QQIQD274plv3rQv2N1HXnqk5jzAJBgUrDgMCGgUAoHgwGAYKKwYBBAGCNwIBDDEK
 # MAigAoAAoQKAADAZBgkqhkiG9w0BCQMxDAYKKwYBBAGCNwIBBDAcBgorBgEEAYI3
-# AgELMQ4wDAYKKwYBBAGCNwIBFTAjBgkqhkiG9w0BCQQxFgQUZUbCfg3+8egU8oVa
-# ZJf/HT9JVMQwDQYJKoZIhvcNAQEBBQAEggEAiCXdyrGbPTbmfLTpLGk4yqbgbUJ/
-# ESYkKY15qIxh+E9BtFVixq5LA6bms+erCqvB4p/o2gV5aOdJdQJn7qYJzIRp0XDO
-# SXN2Ajljuo/1QPyV0A0TrctikwD5gR6gZGo9usMRiU7wTLT4hOM+8vH3A2ew9LkV
-# O/NMRoUdZvcWto5nppAKEnZedXS5CLWfZyyWWQk7IXVyHvrxUqxBn79s/V7wj9zB
-# XBsJu82G8+cGHO7Qte3nu2DTdPcZnRoSmbHN0dUAMbCHA381cQQSDsZPQuEbIfKF
-# DUwkTrc0UxLWsCDHvoeLWMztGslqXyW5Cph6ihNCThDIHvb2YaYqzjDm0Q==
+# AgELMQ4wDAYKKwYBBAGCNwIBFTAjBgkqhkiG9w0BCQQxFgQUg7kx+DPTSoY4QybG
+# w2cWSY8eeoUwDQYJKoZIhvcNAQEBBQAEggEAfUH3Du3unA5Z4sdu4SvEw3NiNLNs
+# xYRkAO81G/H0Qw8lfHYJI83UOir+L9FgUArWRs4kS0CVb0sgE6nP4WtYbuex+U4Y
+# XkKvg48qQ66fkpwPOp+tAS+MFH9JXnwLPjcCSIYYum/HSiefds2L6PatpAZIBUQc
+# bFnBzDXsYqCMMQv5NAMjNJzJkYH35BbchWi5sqsqpZ2/xc9adVOpFuByyB1Ay6Mk
+# plbpnvamdsJeJiN1VJNk7G2DBY/ZlK4W8SjrR4AvrR5yEJKpeEnOPeiLiBeaosMT
+# gM+bFqiVwlKzYbDmPzRgCQtjxO+khs5lPY2gedvRDzxYCSrEoLmQfg9Riw==
 # SIG # End signature block

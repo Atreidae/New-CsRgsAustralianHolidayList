@@ -12,9 +12,9 @@ Holiday Data taken from https://data.gov.au/data/dataset/b1bc6077-dadd-4f61-9f8c
 	    
 	
 ## NOTES  
-Version  	          : 3.0
+Version  	          : 3.1
 
-Date      			  : 6/01/2018
+Date      			  : 21/12/2020
 
 Lync Version	      : Tested against Skype4B Server 2019, 2015 and Lync Server 2013
 
@@ -24,6 +24,11 @@ Header stolen from    : Greig Sheridan who stole it from Pat Richard's amazing "
 
 
 ## Update History
+**:v3.1: The 2020 is almost over build**
+* Fixed, No longer removes old holidays to prevent manual holidays being stripped. Pointed out by Liam over at Qtec (www.qtec.com.au)
+* Updated, Write-Log module is now my modular version which fixes a bug with large logfiles (bigger than 10mb)
+
+
 **:v3.0: The ScoMo holiday build**
 * ScoMo takes a holiday and so does the XML data I was using to get accurate dates
 * Updated, Changed to data.gov.au Datasource. Alot of rewriting
